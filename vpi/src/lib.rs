@@ -41,8 +41,8 @@ macro_rules! printf {
     }}
 }
 
-/// Convert Rust string to ISO-8859-1 encoded C string
-/// Characters outside of ISO-8859-1 range are replaced with ?
+/// Convert Rust string to ASCII < 128 encoded C string
+/// Characters outside of ASCII range are replaced with ?
 pub fn string_to_iso8859_1_cstring(msg: impl AsRef<str>) -> CString {
     // Convert UTF-8 string to ISO-8859-1 bytes
     let iso8859_1_bytes: Vec<u8> = msg
@@ -50,10 +50,10 @@ pub fn string_to_iso8859_1_cstring(msg: impl AsRef<str>) -> CString {
         .chars()
         .map(|c| {
             let code = c as u32;
-            if code <= 0xFF {
+            if code <= 0x7F {
                 code as u8
             } else {
-                b'?' // Replace characters outside ISO-8859-1 range
+                b'?' // Replace characters outside ASCII range
             }
         })
         .collect();

@@ -1,3 +1,4 @@
+use crate::ObjectType;
 use vpi_sys::vpiHandle;
 
 pub struct Handle {
@@ -18,11 +19,11 @@ impl PartialEq for Handle {
 
 impl Drop for Handle {
     fn drop(&mut self) {
-        if !self.is_null() {
+        /*   if !self.is_null() {
             unsafe {
                 vpi_sys::vpi_release_handle(self.handle);
             }
-        }
+        }*/
     }
 }
 
@@ -58,5 +59,37 @@ impl Handle {
             vpi_sys::vpi_handle_by_name(c_name.as_ptr() as *mut i8, std::ptr::null_mut())
         };
         Self::from_raw(handle)
+    }
+
+    #[must_use]
+    pub fn iterator(&self, typ: ObjectType) -> HandleIterator {
+        let raw = unsafe { vpi_sys::vpi_iterate(typ as i32, self.as_raw()) };
+        HandleIterator {
+            iter: Handle::from_raw(raw),
+        }
+    }
+}
+
+pub struct HandleIterator {
+    pub(crate) iter: Handle,
+}
+
+impl Iterator for HandleIterator {
+    type Item = Handle;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.iter.is_null() {
+            return None;
+        }
+
+        let next = Handle::from_raw(unsafe { vpi_sys::vpi_scan(self.iter.as_raw()) });
+
+        if next.is_null() {
+            // The handle is automatically released when the iterator is exhausted
+            self.iter.clear();
+            None
+        } else {
+            Some(next)
+        }
     }
 }

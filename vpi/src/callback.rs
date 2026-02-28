@@ -48,6 +48,30 @@ pub struct CbData {
     pub obj: Handle,
 }
 
+impl Handle {
+    pub fn register_cb<F>(&self, reason: CbReason, callback: F) -> Handle
+    where
+        F: Fn(&CbData) + 'static,
+    {
+        let boxed: Box<F> = Box::new(callback);
+        let user_data = Box::into_raw(boxed).cast::<std::os::raw::c_void>();
+
+        let handle = unsafe {
+            let mut cb_data = vpi_sys::s_cb_data {
+                reason: reason as i32,
+                cb_rtn: Some(trampoline::<F>),
+                obj: self.as_raw(),
+                time: std::ptr::null_mut(),
+                value: std::ptr::null_mut(),
+                index: 0,
+                user_data: user_data.cast::<i8>(),
+            };
+            vpi_sys::vpi_register_cb(&raw mut cb_data)
+        };
+        Handle::from_raw(handle)
+    }
+}
+
 unsafe extern "C" fn trampoline<F>(cb_data: *mut vpi_sys::t_cb_data) -> i32
 where
     F: Fn(&CbData),

@@ -1,5 +1,5 @@
 [workspace]
-members = ["vpi", "vpi-sys", "examples/siminfo", "examples/timescale"]
+members = ["vpi", "vpi-sys", "examples/siminfo", "examples/timescale", "examples/dumper"]
 resolver = "2"
 
 [workspace.package]

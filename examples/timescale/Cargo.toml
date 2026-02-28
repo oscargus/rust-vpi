@@ -7,5 +7,4 @@ edition = "2021"
 crate-type = ["cdylib"]
 
 [dependencies]
-vpi = { path = "../../vpi" }
-vpi-sys = { path = "../../vpi-sys" }
+vpi.workspace = true

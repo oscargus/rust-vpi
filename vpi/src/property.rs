@@ -1,3 +1,6 @@
+use num_derive::{FromPrimitive, ToPrimitive};
+use num_traits::FromPrimitive;
+
 use crate::Handle;
 
 #[repr(i32)]
@@ -38,6 +41,7 @@ impl Property {
 }
 
 #[repr(u32)]
+#[derive(FromPrimitive, ToPrimitive)]
 pub enum Direction {
     Input = vpi_sys::vpiInput,
     Output = vpi_sys::vpiOutput,
@@ -47,6 +51,7 @@ pub enum Direction {
 }
 
 #[repr(u32)]
+#[derive(FromPrimitive, ToPrimitive)]
 pub enum NetType {
     Wire = vpi_sys::vpiWire,
     Wand = vpi_sys::vpiWand,
@@ -59,6 +64,8 @@ pub enum NetType {
     TriOr = vpi_sys::vpiTriOr,
     Supply0 = vpi_sys::vpiSupply0,
     Supply1 = vpi_sys::vpiSupply1,
+    None = vpi_sys::vpiNone,
+    UWire = vpi_sys::vpiUwire,
 }
 
 bitflags::bitflags! {
@@ -116,8 +123,7 @@ impl Handle {
             | Property::FullName
             | Property::DefName
             | Property::File
-            | Property::DefFile
-            | Property::TopModule => unsafe {
+            | Property::DefFile => unsafe {
                 let ptr = vpi_sys::vpi_get_str(property as i32, self.as_raw());
                 if ptr.is_null() {
                     None
@@ -132,5 +138,27 @@ impl Handle {
             },
             _ => None, // For simplicity, only handle common properties here
         }
+    }
+
+    #[must_use]
+    pub fn get_bool(&self, property: Property) -> Option<bool> {
+        if self.is_null() {
+            return None;
+        }
+        match property {
+            Property::TopModule | Property::CellInstance => unsafe {
+                let value = vpi_sys::vpi_get(property as i32, self.as_raw());
+                Some(value != 0)
+            },
+            _ => None, // For simplicity, only handle common properties here
+        }
+    }
+
+    pub fn get_direction(&self) -> Option<Direction> {
+        if self.is_null() {
+            return None;
+        }
+        let value = unsafe { vpi_sys::vpi_get(Property::Direction as i32, self.as_raw()) };
+        Direction::from_u32(value as u32)
     }
 }

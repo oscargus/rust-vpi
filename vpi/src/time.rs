@@ -1,9 +1,22 @@
+use std::fmt::Display;
+
 use crate::Handle;
 
+#[derive(Debug)]
 pub enum Time {
     Sim(u64),
     ScaledReal(f64),
     Suppress,
+}
+
+impl Display for Time {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Time::Sim(sim_time) => write!(f, "Sim({sim_time})"),
+            Time::ScaledReal(scaled_real) => write!(f, "ScaledReal({scaled_real})"),
+            Time::Suppress => write!(f, "Suppress"),
+        }
+    }
 }
 
 impl From<vpi_sys::s_vpi_time> for Time {
