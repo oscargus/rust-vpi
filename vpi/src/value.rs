@@ -9,7 +9,7 @@ pub enum Value {
     String(String),
     Vector(Vec<ScalarValue>),
     Strength(StrengthValue),
-    Time(u64), // Placeholder, as time values are more complex
+    Time(u64),    // Placeholder, as time values are more complex
     ObjType(u32), // Placeholder, as object types are more complex
     Suppress,
 }
@@ -29,7 +29,12 @@ pub enum ValueType {
     Time = vpi_sys::vpiTimeVal as u32,
     ObjType = vpi_sys::vpiObjTypeVal as u32,
     Suppress = vpi_sys::vpiSuppressVal as u32,
-    Unknown(u32)
+    ShortInt = vpi_sys::vpiShortIntVal as u32,
+    LongInt = vpi_sys::vpiLongIntVal as u32,
+    ShortReal = vpi_sys::vpiShortRealVal as u32,
+    RawTwoState = vpi_sys::vpiRawTwoStateVal as u32,
+    RawFourState = vpi_sys::vpiRawFourStateVal as u32,
+    Unknown(u32),
 }
 
 #[repr(u32)]
@@ -43,13 +48,24 @@ pub enum ScalarValue {
     DontCare = vpi_sys::vpiDontCare,
 }
 
-pub enum StrengthValue {
-    SupplyDrive,
-    StrongDrive,
-    PullDrive,
-    LargeCharge,
-    WeakDrive,
-    MediumCharge,
-    SmallCharge,
-    HiZ,
+bitflags::bitflags! {
+    pub struct StrengthValue: u32 {
+        const SupplyDrive = vpi_sys::vpiSupplyDrive;
+        const StrongDrive = vpi_sys::vpiStrongDrive;
+        const PullDrive = vpi_sys::vpiPullDrive;
+        const LargeCharge = vpi_sys::vpiLargeCharge;
+        const WeakDrive = vpi_sys::vpiWeakDrive;
+        const MediumCharge = vpi_sys::vpiMediumCharge;
+        const SmallCharge = vpi_sys::vpiSmallCharge;
+        const HiZ = vpi_sys::vpiHiZ;
+    }
+}
+
+bitflags::bitflags! {
+    pub struct PutValueFlags: u32 {
+        const ReturnEvent = vpi_sys::vpiReturnEvent;
+        const UserAllocFlag = vpi_sys::vpiUserAllocFlag;
+        const OneValue = vpi_sys::vpiOneValue;
+        const PropagateOff = vpi_sys::vpiPropagateOff;
+    }
 }

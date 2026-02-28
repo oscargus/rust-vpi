@@ -1,5 +1,5 @@
 [workspace]
-members = ["siminfo","vpi","vpi-sys"]
+members = ["siminfo","vpi","vpi-sys", "examples/timescale"]
 resolver = "2"
 
 [workspace.package]
@@ -10,5 +10,7 @@ edition = "2024"
 [workspace.dependencies]
 bindgen = "0.72.1"
 bitflags = "2"
+num-traits = "0.2"
+num-derive = "0.4"
 vpi-sys = {path = "vpi-sys"}
 vpi = {path = "vpi"}

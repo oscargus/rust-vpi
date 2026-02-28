@@ -1,4 +1,6 @@
 // Simple Verilog testbench for testing VPI functionality
+`timescale 1ns / 1ps
+
 module testbench;
     // Clock signal
     reg clk;
