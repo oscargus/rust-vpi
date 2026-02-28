@@ -29,7 +29,7 @@ pub struct VPIError {
     pub product: String,
 }
 
-#[must_use] 
+#[must_use]
 pub fn chk_error() -> Option<VPIError> {
     let mut error_info = vpi_sys::t_vpi_error_info {
         code: std::ptr::null_mut(),
@@ -75,7 +75,7 @@ pub fn chk_error() -> Option<VPIError> {
 }
 
 /// Alias of `chk_error` for consistency with rust-vhpi
-#[must_use] 
+#[must_use]
 pub fn check_error() -> Option<VPIError> {
     chk_error()
 }

@@ -5,3 +5,9 @@ pub enum Control {
     Reset = vpi_sys::vpiReset,
     SetInteractiveScope = vpi_sys::vpiSetInteractiveScope,
 }
+
+pub fn control(control: Control) {
+    unsafe {
+        vpi_sys::vpi_control(control as i32);
+    }
+}

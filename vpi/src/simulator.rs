@@ -1,4 +1,4 @@
-#[must_use] 
+#[must_use]
 pub fn simulator_info() -> SimulatorInfo {
     let mut vlog_info = vpi_sys::t_vpi_vlog_info {
         argc: 0,
@@ -92,13 +92,13 @@ impl Timescale {
 
     /// Convert time unit/precision to a human-readable string
     /// E.g., -9 => "1ns", -12 => "1ps"
-    #[must_use] 
+    #[must_use]
     pub fn unit_str(&self) -> String {
         power_of_10_to_time_str(self.unit)
     }
 
     /// Convert time precision to a human-readable string
-    #[must_use] 
+    #[must_use]
     pub fn precision_str(&self) -> String {
         power_of_10_to_time_str(self.precision)
     }
@@ -130,7 +130,7 @@ fn power_of_10_to_time_str(power: i32) -> String {
 /// Get timescale for the top-level modules
 ///
 /// Returns a vector of (`module_name`, timescale) tuples for all top-level modules
-#[must_use] 
+#[must_use]
 pub fn get_top_module_timescales() -> Vec<(String, Option<Timescale>)> {
     let mut results = Vec::new();
 

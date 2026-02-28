@@ -1,3 +1,5 @@
+use crate::Handle;
+
 #[repr(i32)]
 pub enum Property {
     Name = vpi_sys::vpiName as i32,
@@ -101,4 +103,34 @@ pub enum SysFuncType {
     Real = vpi_sys::vpiSysFuncReal,
     Time = vpi_sys::vpiSysFuncTime,
     Sized = vpi_sys::vpiSysFuncSized,
+}
+
+impl Handle {
+    #[must_use]
+    pub fn get_str(&self, property: Property) -> Option<String> {
+        if self.is_null() {
+            return None;
+        }
+        match property {
+            Property::Name
+            | Property::FullName
+            | Property::DefName
+            | Property::File
+            | Property::DefFile
+            | Property::TopModule => unsafe {
+                let ptr = vpi_sys::vpi_get_str(property as i32, self.as_raw());
+                if ptr.is_null() {
+                    None
+                } else {
+                    let c_str = std::ffi::CStr::from_ptr(ptr);
+                    if let Ok(str_slice) = c_str.to_str() {
+                        Some(str_slice.to_string())
+                    } else {
+                        None
+                    }
+                }
+            },
+            _ => None, // For simplicity, only handle common properties here
+        }
+    }
 }

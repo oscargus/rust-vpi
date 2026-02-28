@@ -1,4 +1,4 @@
-use crate::Handle;
+use crate::{Handle, Time};
 
 #[repr(u32)]
 pub enum CbReason {
@@ -26,6 +26,12 @@ pub enum CbReason {
     ExitInteractive = vpi_sys::cbExitInteractive,
     InteractiveScopeChange = vpi_sys::cbInteractiveScopeChange,
     UnresolvedSystf = vpi_sys::cbUnresolvedSystf,
+    PLIError = vpi_sys::cbPLIError,
+    Assign = vpi_sys::cbAssign,
+    Deassign = vpi_sys::cbDeassign,
+    Disable = vpi_sys::cbDisable,
+    Signal = vpi_sys::cbSignal,
+    NBASynch = vpi_sys::cbNBASynch,
     AtEndOfSimTime = vpi_sys::cbAtEndOfSimTime,
 }
 
@@ -86,4 +92,36 @@ where
         vpi_sys::vpi_register_cb(&raw mut cb_data)
     };
     Handle::from_raw(handle)
+}
+
+pub fn register_cb_with_time<F>(reason: CbReason, time: Time, callback: F) -> Handle
+where
+    F: Fn(&CbData) + 'static,
+{
+    let boxed: Box<F> = Box::new(callback);
+    let user_data = Box::into_raw(boxed).cast::<i8>();
+
+    let handle = unsafe {
+        let mut cb_data = vpi_sys::s_cb_data {
+            reason: reason as i32,
+            cb_rtn: Some(trampoline::<F>),
+            obj: std::ptr::null_mut(),
+            time: &mut time.into() as *mut _,
+            value: std::ptr::null_mut(),
+            index: 0,
+            user_data,
+        };
+        vpi_sys::vpi_register_cb(&raw mut cb_data)
+    };
+    Handle::from_raw(handle)
+}
+
+pub fn remove_cb(handle: Handle) {
+    if !handle.is_null() {
+        unsafe {
+            vpi_sys::vpi_remove_cb(handle.as_raw());
+            // SAFETY: We assume the callback was registered with a Box, so we can safely reconstruct it and drop it
+            let _ = Box::from_raw(handle.as_raw().cast::<i8>());
+        }
+    }
 }
