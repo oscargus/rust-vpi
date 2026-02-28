@@ -11,16 +11,19 @@ impl Default for Handle {
 }
 
 impl Handle {
+    #[must_use] 
     pub fn null() -> Self {
         Self {
             handle: std::ptr::null_mut(),
         }
     }
 
+    #[must_use] 
     pub fn is_null(&self) -> bool {
         self.handle.is_null()
     }
 
+    #[must_use] 
     pub fn as_raw(&self) -> vpiHandle {
         self.handle
     }

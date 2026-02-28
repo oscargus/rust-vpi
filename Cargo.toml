@@ -1,5 +1,5 @@
 [workspace]
-members = ["siminfo","vpi","vpi-sys", "examples/timescale"]
+members = ["vpi", "vpi-sys", "examples/siminfo", "examples/timescale"]
 resolver = "2"
 
 [workspace.package]
@@ -12,5 +12,5 @@ bindgen = "0.72.1"
 bitflags = "2"
 num-traits = "0.2"
 num-derive = "0.4"
-vpi-sys = {path = "vpi-sys"}
-vpi = {path = "vpi"}
+vpi-sys = { path = "vpi-sys" }
+vpi = { path = "vpi" }

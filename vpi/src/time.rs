@@ -7,7 +7,7 @@ pub enum Time {
 impl From<vpi_sys::s_vpi_time> for Time {
     fn from(vpi_time: vpi_sys::s_vpi_time) -> Self {
         match vpi_time.type_ as u32 {
-            vpi_sys::vpiSimTime => Time::Sim((vpi_time.high as u64) << 32 | vpi_time.low as u64),
+            vpi_sys::vpiSimTime => Time::Sim(u64::from(vpi_time.high) << 32 | u64::from(vpi_time.low)),
             vpi_sys::vpiScaledRealTime => Time::ScaledReal(vpi_time.real),
             vpi_sys::vpiSuppressTime => Time::Suppress,
             _ => panic!("Unknown time type: {}", vpi_time.type_),
@@ -41,6 +41,7 @@ impl From<Time> for vpi_sys::s_vpi_time {
 }
 
 impl Time {
+    #[must_use] 
     pub fn time_type(&self) -> i32 {
         match self {
             Time::Sim(_) => vpi_sys::vpiSimTime as i32,

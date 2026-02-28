@@ -4,7 +4,7 @@
 set -e
 
 echo "=== Building Timescale VPI Plugin ==="
-cargo build --release --manifest-path examples/timescale/Cargo.toml
+cargo build --release -p timescale
 
 echo ""
 echo "=== Running Verilog Testbench with Timescale VPI ==="

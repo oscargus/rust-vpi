@@ -81,9 +81,9 @@ where
             time: std::ptr::null_mut(),
             value: std::ptr::null_mut(),
             index: 0,
-            user_data: user_data as *mut i8,
+            user_data: user_data.cast::<i8>(),
         };
-        vpi_sys::vpi_register_cb(&mut cb_data)
+        vpi_sys::vpi_register_cb(&raw mut cb_data)
     };
     Handle::from_raw(handle)
 }

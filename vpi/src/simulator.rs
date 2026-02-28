@@ -1,3 +1,4 @@
+#[must_use] 
 pub fn simulator_info() -> SimulatorInfo {
     let mut vlog_info = vpi_sys::t_vpi_vlog_info {
         argc: 0,
@@ -5,7 +6,7 @@ pub fn simulator_info() -> SimulatorInfo {
         version: std::ptr::null_mut(),
         product: std::ptr::null_mut(),
     };
-    unsafe { vpi_sys::vpi_get_vlog_info(&mut vlog_info) };
+    unsafe { vpi_sys::vpi_get_vlog_info(&raw mut vlog_info) };
     let version = unsafe { std::ffi::CStr::from_ptr(vlog_info.version) }
         .to_str()
         .unwrap_or("Unknown")
@@ -45,7 +46,7 @@ pub fn simulator_name() -> String {
         version: std::ptr::null_mut(),
         product: std::ptr::null_mut(),
     };
-    unsafe { vpi_sys::vpi_get_vlog_info(&mut vlog_info) };
+    unsafe { vpi_sys::vpi_get_vlog_info(&raw mut vlog_info) };
     unsafe { std::ffi::CStr::from_ptr(vlog_info.product) }
         .to_str()
         .unwrap_or("Unknown")
@@ -60,7 +61,7 @@ pub fn simulator_version() -> String {
         version: std::ptr::null_mut(),
         product: std::ptr::null_mut(),
     };
-    unsafe { vpi_sys::vpi_get_vlog_info(&mut vlog_info) };
+    unsafe { vpi_sys::vpi_get_vlog_info(&raw mut vlog_info) };
     unsafe { std::ffi::CStr::from_ptr(vlog_info.version) }
         .to_str()
         .unwrap_or("Unknown")
@@ -91,11 +92,13 @@ impl Timescale {
 
     /// Convert time unit/precision to a human-readable string
     /// E.g., -9 => "1ns", -12 => "1ps"
+    #[must_use] 
     pub fn unit_str(&self) -> String {
         power_of_10_to_time_str(self.unit)
     }
 
     /// Convert time precision to a human-readable string
+    #[must_use] 
     pub fn precision_str(&self) -> String {
         power_of_10_to_time_str(self.precision)
     }
@@ -120,13 +123,14 @@ fn power_of_10_to_time_str(power: i32) -> String {
         -9 => "1ns".to_string(),
         -12 => "1ps".to_string(),
         -15 => "1fs".to_string(),
-        _ => format!("10^{}s", power),
+        _ => format!("10^{power}s"),
     }
 }
 
 /// Get timescale for the top-level modules
 ///
-/// Returns a vector of (module_name, timescale) tuples for all top-level modules
+/// Returns a vector of (`module_name`, timescale) tuples for all top-level modules
+#[must_use] 
 pub fn get_top_module_timescales() -> Vec<(String, Option<Timescale>)> {
     let mut results = Vec::new();
 
@@ -145,13 +149,13 @@ pub fn get_top_module_timescales() -> Vec<(String, Option<Timescale>)> {
 
             // Get module name
             let name_ptr = vpi_sys::vpi_get_str(crate::Property::Name as i32, module);
-            let name = if !name_ptr.is_null() {
+            let name = if name_ptr.is_null() {
+                "Unknown".to_string()
+            } else {
                 std::ffi::CStr::from_ptr(name_ptr)
                     .to_str()
                     .unwrap_or("Unknown")
                     .to_string()
-            } else {
-                "Unknown".to_string()
             };
 
             // Get timescale

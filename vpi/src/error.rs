@@ -29,6 +29,7 @@ pub struct VPIError {
     pub product: String,
 }
 
+#[must_use] 
 pub fn chk_error() -> Option<VPIError> {
     let mut error_info = vpi_sys::t_vpi_error_info {
         code: std::ptr::null_mut(),
@@ -39,7 +40,7 @@ pub fn chk_error() -> Option<VPIError> {
         state: 0,
         product: std::ptr::null_mut(),
     };
-    let error_code = unsafe { vpi_sys::vpi_chk_error(&mut error_info) };
+    let error_code = unsafe { vpi_sys::vpi_chk_error(&raw mut error_info) };
     if error_code == 0 {
         None
     } else {
@@ -52,15 +53,15 @@ pub fn chk_error() -> Option<VPIError> {
                 .to_str()
                 .unwrap_or("Unknown")
                 .to_string(),
-            file: if !error_info.file.is_null() {
+            file: if error_info.file.is_null() {
+                None
+            } else {
                 Some(
                     unsafe { std::ffi::CStr::from_ptr(error_info.file) }
                         .to_str()
                         .unwrap_or("Unknown")
                         .to_string(),
                 )
-            } else {
-                None
             },
             line: error_info.line,
             severity: Severity::from_i32(error_info.level),
@@ -74,6 +75,7 @@ pub fn chk_error() -> Option<VPIError> {
 }
 
 /// Alias of `chk_error` for consistency with rust-vhpi
+#[must_use] 
 pub fn check_error() -> Option<VPIError> {
     chk_error()
 }

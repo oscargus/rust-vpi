@@ -14,7 +14,7 @@ pub enum Property {
     DefLineNo = vpi_sys::vpiDefLineNo as i32,
     Scalar = vpi_sys::vpiScalar as i32,
     Vector = vpi_sys::vpiVector as i32,
-    Undefined = vpi_sys::vpiUndefined as i32,
+    Undefined = vpi_sys::vpiUndefined,
     TopModule = vpi_sys::vpiTopModule as i32,
     Direction = vpi_sys::vpiDirection as i32,
     NetType = vpi_sys::vpiNetType as i32,
@@ -61,16 +61,16 @@ pub enum NetType {
 
 bitflags::bitflags! {
     pub struct Edge: u32 {
-        const NoEdge = vpi_sys::vpiNoEdge as u32;
-        const Edge01 = vpi_sys::vpiEdge01 as u32;
-        const Edge10 = vpi_sys::vpiEdge10 as u32;
-        const Edge0x = vpi_sys::vpiEdge0x as u32;
-        const Edge1x = vpi_sys::vpiEdge1x as u32;
-        const Edgex0 = vpi_sys::vpiEdgex0 as u32;
-        const Edgex1 = vpi_sys::vpiEdgex1 as u32;
-        const Posedge = vpi_sys::vpiPosedge as u32;
-        const Negedge = vpi_sys::vpiNegedge as u32;
-        const AnyEdge = vpi_sys::vpiAnyEdge as u32;
+        const NoEdge = vpi_sys::vpiNoEdge;
+        const Edge01 = vpi_sys::vpiEdge01;
+        const Edge10 = vpi_sys::vpiEdge10;
+        const Edge0x = vpi_sys::vpiEdge0x;
+        const Edge1x = vpi_sys::vpiEdge1x;
+        const Edgex0 = vpi_sys::vpiEdgex0;
+        const Edgex1 = vpi_sys::vpiEdgex1;
+        const Posedge = vpi_sys::vpiPosedge;
+        const Negedge = vpi_sys::vpiNegedge;
+        const AnyEdge = vpi_sys::vpiAnyEdge;
     }
 }
 
