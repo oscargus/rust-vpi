@@ -1,0 +1,14 @@
+[workspace]
+members = ["siminfo","vpi","vpi-sys"]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+
+
+[workspace.dependencies]
+bindgen = "0.72.1"
+bitflags = "2"
+vpi-sys = {path = "vpi-sys"}
+vpi = {path = "vpi"}

@@ -1,0 +1,13 @@
+[package]
+name = "vpi"
+version.workspace = true
+edition.workspace = true
+
+
+[lib]
+name = "vpi"
+path = "src/lib.rs"
+
+[dependencies]
+bitflags.workspace = true
+vpi-sys.workspace = true
