@@ -80,7 +80,7 @@ impl Handle {
             low: 0,
             real: 0.0,
         };
-        unsafe { vpi_sys::vpi_get_time(self.as_raw(), &mut vpi_time) };
+        unsafe { vpi_sys::vpi_get_time(self.as_raw(), &raw mut vpi_time) };
         Some(Time::from(vpi_time))
     }
 }

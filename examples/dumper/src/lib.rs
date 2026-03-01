@@ -36,10 +36,7 @@ fn walk_hierarchy(handle: &vpi::Handle, indent: usize) {
         let signal_type = signal
             .get_str(vpi::Property::Type)
             .unwrap_or("<unknown>".to_string());
-        vpi::printf!(
-            "{}Signal: {name} ({signal_type})",
-            " ".repeat(indent + 1)
-        );
+        vpi::printf!("{}Signal: {name} ({signal_type})", " ".repeat(indent + 1));
         signal.register_cb(vpi::CbReason::ValueChange, move |cb_data| {
             let name = cb_data
                 .obj

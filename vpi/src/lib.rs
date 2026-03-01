@@ -28,8 +28,8 @@ pub fn printf(msg: impl AsRef<str>) {
     let cstr = string_to_iso8859_1_cstring(msg);
     unsafe {
         vpi_sys::vpi_printf(
-            FMT.as_ptr().cast::<i8>() as *mut i8,
-            cstr.as_ptr() as *mut i8,
+            FMT.as_ptr().cast::<i8>().cast_mut(),
+            cstr.as_ptr().cast_mut(),
         )
     };
 }

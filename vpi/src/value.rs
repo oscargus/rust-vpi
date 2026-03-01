@@ -3,7 +3,7 @@ use std::fmt::Display;
 use num_derive::{FromPrimitive, ToPrimitive};
 use num_traits::FromPrimitive;
 
-use crate::{Handle, Time};
+use crate::{Handle, Property, Time};
 
 #[derive(Debug)]
 pub enum Value {
@@ -36,10 +36,7 @@ impl Display for Value {
                 write!(
                     f,
                     "{}",
-                    vec.iter()
-                        .map(|s| format!("{s}"))
-                        .collect::<Vec<String>>()
-                        .join("")
+                    vec.iter().map(|s| format!("{s}")).collect::<String>()
                 )
             }
             Value::Strength(strength) => write!(f, "{strength}"),
@@ -126,9 +123,22 @@ impl Display for ScalarValue {
     }
 }
 
+#[derive(Debug)]
+pub struct StrengthValue {
+    logic: ScalarValue,
+    strength0: StrengthEncoding,
+    strength1: StrengthEncoding,
+}
+
+impl Display for StrengthValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} ({}, {})", self.logic, self.strength0, self.strength1)
+    }
+}
+
 bitflags::bitflags! {
     #[derive(Debug)]
-    pub struct StrengthValue: u32 {
+    pub struct StrengthEncoding: u32 {
         const SupplyDrive = vpi_sys::vpiSupplyDrive;
         const StrongDrive = vpi_sys::vpiStrongDrive;
         const PullDrive = vpi_sys::vpiPullDrive;
@@ -140,31 +150,31 @@ bitflags::bitflags! {
     }
 }
 
-impl Display for StrengthValue {
+impl Display for StrengthEncoding {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut strengths = Vec::new();
-        if self.contains(StrengthValue::SupplyDrive) {
+        if self.contains(StrengthEncoding::SupplyDrive) {
             strengths.push("SupplyDrive");
         }
-        if self.contains(StrengthValue::StrongDrive) {
+        if self.contains(StrengthEncoding::StrongDrive) {
             strengths.push("StrongDrive");
         }
-        if self.contains(StrengthValue::PullDrive) {
+        if self.contains(StrengthEncoding::PullDrive) {
             strengths.push("PullDrive");
         }
-        if self.contains(StrengthValue::LargeCharge) {
+        if self.contains(StrengthEncoding::LargeCharge) {
             strengths.push("LargeCharge");
         }
-        if self.contains(StrengthValue::WeakDrive) {
+        if self.contains(StrengthEncoding::WeakDrive) {
             strengths.push("WeakDrive");
         }
-        if self.contains(StrengthValue::MediumCharge) {
+        if self.contains(StrengthEncoding::MediumCharge) {
             strengths.push("MediumCharge");
         }
-        if self.contains(StrengthValue::SmallCharge) {
+        if self.contains(StrengthEncoding::SmallCharge) {
             strengths.push("SmallCharge");
         }
-        if self.contains(StrengthValue::HiZ) {
+        if self.contains(StrengthEncoding::HiZ) {
             strengths.push("HiZ");
         }
         write!(f, "{}", strengths.join(" | "))
@@ -189,8 +199,9 @@ bitflags::bitflags! {
 /// - ab: 01 = Z (Z)
 ///
 /// # Arguments
-/// * `vec` - Array of vpi_vecval structures containing the encoded bits
+/// * `vec` - Array of `vpi_vecval` structures containing the encoded bits
 /// * `size` - Number of bits to extract
+#[must_use]
 pub fn vector_value_to_scalar_vector(
     vec: &[vpi_sys::t_vpi_vecval],
     size: usize,
@@ -235,6 +246,7 @@ pub fn vector_value_to_scalar_vector(
 }
 
 impl Handle {
+    #[must_use]
     pub fn get_value(&self, format: ValueType) -> Option<Value> {
         if self.is_null() {
             return None;
@@ -243,7 +255,7 @@ impl Handle {
             format: format as i32,
             value: vpi_sys::t_vpi_value__bindgen_ty_1 { integer: 0 },
         };
-        unsafe { vpi_sys::vpi_get_value(self.as_raw(), &mut value) };
+        unsafe { vpi_sys::vpi_get_value(self.as_raw(), &raw mut value) };
         let value = match value.format as u32 {
             vpi_sys::vpiBinStrVal
             | vpi_sys::vpiOctStrVal
@@ -282,5 +294,260 @@ impl Handle {
             _ => return None,
         };
         Some(value)
+    }
+
+    /// Retrieve an array of values from a Verilog object (e.g., memory array, packet array).
+    ///
+    /// This function calls `vpi_get_value_array` to fetch multiple values at once.
+    /// It handles various value formats and automatically allocates the necessary memory.
+    ///
+    /// # Arguments
+    /// * `format` - The format of values to retrieve (Int, Real, Time, etc.)
+    ///
+    /// # Returns
+    /// * `Some(Vec<Value>)` - A vector of retrieved values
+    /// * `None` - If the handle is null or the operation fails
+    ///
+    /// # Example
+    /// ```ignore
+    /// let mem = root.scan(vpi_sys::vpiMem)?;
+    /// if let Some(values) = mem.get_value_array(ValueType::Int) {
+    ///     for (i, val) in values.iter().enumerate() {
+    ///         println!("Memory[{}] = {}", i, val);
+    ///     }
+    /// }
+    /// ```
+    pub fn get_value_array(&self, format: ValueType) -> Option<Vec<Value>> {
+        if self.is_null() {
+            return None;
+        }
+
+        let size = unsafe { vpi_sys::vpi_get(vpi_sys::vpiSize as i32, self.as_raw()) } as usize;
+
+        if size == 0 {
+            return Some(Vec::new());
+        }
+
+        match format {
+            ValueType::Int => {
+                let mut integers: Vec<i32> = vec![0; size];
+                let mut arrayvalue = vpi_sys::t_vpi_arrayvalue {
+                    format: vpi_sys::vpiIntVal,
+                    flags: 0,
+                    value: vpi_sys::t_vpi_arrayvalue__bindgen_ty_1 {
+                        integers: integers.as_mut_ptr(),
+                    },
+                };
+                let mut index = 0;
+
+                unsafe {
+                    vpi_sys::vpi_get_value_array(
+                        self.as_raw(),
+                        &raw mut arrayvalue,
+                        &raw mut index,
+                        size as u32,
+                    );
+                }
+
+                Some(integers.into_iter().map(Value::Int).collect::<Vec<Value>>())
+            }
+            ValueType::Real => {
+                let mut reals: Vec<f64> = vec![0.0; size];
+                let mut arrayvalue = vpi_sys::t_vpi_arrayvalue {
+                    format: vpi_sys::vpiRealVal,
+                    flags: 0,
+                    value: vpi_sys::t_vpi_arrayvalue__bindgen_ty_1 {
+                        reals: reals.as_mut_ptr(),
+                    },
+                };
+                let mut index = 0;
+
+                unsafe {
+                    vpi_sys::vpi_get_value_array(
+                        self.as_raw(),
+                        &raw mut arrayvalue,
+                        &raw mut index,
+                        size as u32,
+                    );
+                }
+
+                Some(reals.into_iter().map(Value::Real).collect::<Vec<Value>>())
+            }
+            ValueType::Time => {
+                let mut times: Vec<vpi_sys::t_vpi_time> = vec![
+                    vpi_sys::t_vpi_time {
+                        type_: 0,
+                        high: 0,
+                        low: 0,
+                        real: 0.0,
+                    };
+                    size
+                ];
+                let mut arrayvalue = vpi_sys::t_vpi_arrayvalue {
+                    format: vpi_sys::vpiTimeVal,
+                    flags: 0,
+                    value: vpi_sys::t_vpi_arrayvalue__bindgen_ty_1 {
+                        times: times.as_mut_ptr(),
+                    },
+                };
+                let mut index = 0;
+
+                unsafe {
+                    vpi_sys::vpi_get_value_array(
+                        self.as_raw(),
+                        &raw mut arrayvalue,
+                        &raw mut index,
+                        size as u32,
+                    );
+                }
+
+                Some(
+                    times
+                        .into_iter()
+                        .map(|t| {
+                            let vpi_time = vpi_sys::s_vpi_time {
+                                type_: t.type_,
+                                high: t.high,
+                                low: t.low,
+                                real: t.real,
+                            };
+                            Value::Time(Time::from(vpi_time))
+                        })
+                        .collect::<Vec<Value>>(),
+                )
+            }
+            ValueType::ShortInt => {
+                let mut shortints: Vec<i16> = vec![0; size];
+                let mut arrayvalue = vpi_sys::t_vpi_arrayvalue {
+                    format: vpi_sys::vpiShortIntVal,
+                    flags: 0,
+                    value: vpi_sys::t_vpi_arrayvalue__bindgen_ty_1 {
+                        shortints: shortints.as_mut_ptr(),
+                    },
+                };
+                let mut index = 0;
+
+                unsafe {
+                    vpi_sys::vpi_get_value_array(
+                        self.as_raw(),
+                        &raw mut arrayvalue,
+                        &raw mut index,
+                        size as u32,
+                    );
+                }
+
+                Some(
+                    shortints
+                        .into_iter()
+                        .map(|v| Value::Int(i32::from(v)))
+                        .collect::<Vec<Value>>(),
+                )
+            }
+            ValueType::LongInt => {
+                let mut longints: Vec<i64> = vec![0; size];
+                let mut arrayvalue = vpi_sys::t_vpi_arrayvalue {
+                    format: vpi_sys::vpiLongIntVal,
+                    flags: 0,
+                    value: vpi_sys::t_vpi_arrayvalue__bindgen_ty_1 {
+                        longints: longints.as_mut_ptr(),
+                    },
+                };
+                let mut index = 0;
+
+                unsafe {
+                    vpi_sys::vpi_get_value_array(
+                        self.as_raw(),
+                        &raw mut arrayvalue,
+                        &raw mut index,
+                        size as u32,
+                    );
+                }
+
+                Some(
+                    longints
+                        .into_iter()
+                        .map(|v| Value::Int(v as i32))
+                        .collect::<Vec<Value>>(),
+                )
+            }
+            ValueType::ShortReal => {
+                let mut shortreals: Vec<f32> = vec![0.0; size];
+                let mut arrayvalue = vpi_sys::t_vpi_arrayvalue {
+                    format: vpi_sys::vpiShortRealVal,
+                    flags: 0,
+                    value: vpi_sys::t_vpi_arrayvalue__bindgen_ty_1 {
+                        shortreals: shortreals.as_mut_ptr(),
+                    },
+                };
+                let mut index = 0;
+
+                unsafe {
+                    vpi_sys::vpi_get_value_array(
+                        self.as_raw(),
+                        &raw mut arrayvalue,
+                        &raw mut index,
+                        size as u32,
+                    );
+                }
+
+                Some(
+                    shortreals
+                        .into_iter()
+                        .map(|v| Value::Real(f64::from(v)))
+                        .collect::<Vec<Value>>(),
+                )
+            }
+            ValueType::Vector => {
+                // For vector arrays, each element needs to be read individually
+                // as the size calculation is different (bits per element vs. total bits)
+                let mut values = Vec::with_capacity(size);
+                for _ in 0..size {
+                    if let Some(val) = self.get_value(ValueType::Vector) {
+                        values.push(val);
+                    }
+                }
+                Some(values)
+            }
+            ValueType::Scalar => {
+                // For scalar arrays
+                let mut rawvals: Vec<i8> = vec![0; size];
+                let mut arrayvalue = vpi_sys::t_vpi_arrayvalue {
+                    format: vpi_sys::vpiScalarVal,
+                    flags: 0,
+                    value: vpi_sys::t_vpi_arrayvalue__bindgen_ty_1 {
+                        rawvals: rawvals.as_mut_ptr(),
+                    },
+                };
+                let mut index = 0;
+
+                unsafe {
+                    vpi_sys::vpi_get_value_array(
+                        self.as_raw(),
+                        &raw mut arrayvalue,
+                        &raw mut index,
+                        size as u32,
+                    );
+                }
+
+                Some(
+                    rawvals
+                        .into_iter()
+                        .filter_map(|v| ScalarValue::from_u32(v as u32).map(Value::Scalar))
+                        .collect::<Vec<Value>>(),
+                )
+            }
+            _ => {
+                // For unsupported types, return empty vector
+                Some(Vec::new())
+            }
+        }
+    }
+
+    #[must_use]
+    pub fn is_array(&self) -> bool {
+        if self.is_null() {
+            return false;
+        }
+        self.get_bool(Property::Array) == Some(true)
     }
 }

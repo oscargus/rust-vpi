@@ -130,7 +130,7 @@ where
             reason: reason as i32,
             cb_rtn: Some(trampoline::<F>),
             obj: std::ptr::null_mut(),
-            time: &mut time.into() as *mut _,
+            time: std::ptr::from_mut(&mut time.into()),
             value: std::ptr::null_mut(),
             index: 0,
             user_data,

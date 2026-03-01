@@ -5,92 +5,166 @@ use crate::Handle;
 
 #[repr(i32)]
 pub enum Property {
-    // Special value
-    Undefined = vpi_sys::vpiUndefined,                       // -1: undefined property
+    /// -1: undefined property
+    Undefined = vpi_sys::vpiUndefined,
 
     // Basic object properties (1-18)
-    Type = vpi_sys::vpiType as i32,                          // 1: type of object
-    Name = vpi_sys::vpiName as i32,                          // 2: local name of object
-    FullName = vpi_sys::vpiFullName as i32,                  // 3: full hierarchical name
-    Size = vpi_sys::vpiSize as i32,                          // 4: size of gate, net, port, etc.
-    File = vpi_sys::vpiFile as i32,                          // 5: file name in which object is used
-    LineNo = vpi_sys::vpiLineNo as i32,                      // 6: line number where object is used
-    TopModule = vpi_sys::vpiTopModule as i32,                // 7: top-level module (boolean)
-    CellInstance = vpi_sys::vpiCellInstance as i32,          // 8: cell (boolean)
-    DefName = vpi_sys::vpiDefName as i32,                    // 9: module definition name
-    // GAP: 10 = vpiProtected (source protected module, boolean)
-    TimeUnit = vpi_sys::vpiTimeUnit as i32,                  // 11: module time unit
-    TimePrecision = vpi_sys::vpiTimePrecision as i32,        // 12: module time precision
-    // GAP: 13 = vpiDefNetType (default net type)
-    // GAP: 14 = vpiUnconnDrive (unconnected port drive strength)
-    DefFile = vpi_sys::vpiDefFile as i32,                    // 15: file name where module is defined
-    DefLineNo = vpi_sys::vpiDefLineNo as i32,                // 16: line number for module definition
-    Scalar = vpi_sys::vpiScalar as i32,                      // 17: scalar (boolean)
-    Vector = vpi_sys::vpiVector as i32,                      // 18: vector (boolean)
+    /// 1: type of object
+    Type = vpi_sys::vpiType as i32,
+    /// 2: local name of object
+    Name = vpi_sys::vpiName as i32,
+    /// 3: full hierarchical name
+    FullName = vpi_sys::vpiFullName as i32,
+    /// 4: size of gate, net, port, etc.
+    Size = vpi_sys::vpiSize as i32,
+    /// 5: file name in which object is used
+    File = vpi_sys::vpiFile as i32,
+    /// 6: line number where object is used
+    LineNo = vpi_sys::vpiLineNo as i32,
+    /// 7: top-level module (boolean)
+    TopModule = vpi_sys::vpiTopModule as i32,
+    /// 8: cell (boolean)
+    CellInstance = vpi_sys::vpiCellInstance as i32,
+    /// 9: module definition name
+    DefName = vpi_sys::vpiDefName as i32,
+    /// 10: source protected module (boolean)
+    Protected = vpi_sys::vpiProtected as i32,
+    /// 11: module time unit
+    TimeUnit = vpi_sys::vpiTimeUnit as i32,
+    /// 12: module time precision
+    TimePrecision = vpi_sys::vpiTimePrecision as i32,
+    /// 13: default net type
+    DefNetType = vpi_sys::vpiDefNetType as i32,
+    /// 14: unconnected port drive strength
+    UnconnDrive = vpi_sys::vpiUnconnDrive as i32,
+    /// 15: file name where module is defined
+    DefFile = vpi_sys::vpiDefFile as i32,
+    /// 16: line number for module definition
+    DefLineNo = vpi_sys::vpiDefLineNo as i32,
+    /// 17: scalar (boolean)
+    Scalar = vpi_sys::vpiScalar as i32,
+    /// 18: vector (boolean)
+    Vector = vpi_sys::vpiVector as i32,
 
     // Net and port properties (19-29)
-    // GAP: 19 = vpiExplicitName (port is explicitly named, boolean)
-    Direction = vpi_sys::vpiDirection as i32,                // 20: direction of port
-    // GAP: 21 = vpiConnByName (connected by name, boolean)
-    NetType = vpi_sys::vpiNetType as i32,                    // 22: net subtypes
-    // GAP: 23 = vpiExplicitScalared (explicitly scalared, boolean)
-    // GAP: 24 = vpiExplicitVectored (explicitly vectored, boolean)
-    // GAP: 25 = vpiExpanded (expanded vector net, boolean)
-    // GAP: 26 = vpiImplicitDecl (implicitly declared net, boolean)
-    // GAP: 27 = vpiChargeStrength (charge decay strength of net)
-    Array = vpi_sys::vpiArray as i32,                        // 28: variable array (boolean)
-    PortIndex = vpi_sys::vpiPortIndex as i32,                // 29: port index
+    /// 19: port is explicitly named (boolean)
+    ExplicitName = vpi_sys::vpiExplicitName as i32,
+    /// 20: direction of port
+    Direction = vpi_sys::vpiDirection as i32,
+    /// 21: connected by name (boolean)
+    ConnByName = vpi_sys::vpiConnByName as i32,
+    /// 22: net subtypes
+    NetType = vpi_sys::vpiNetType as i32,
+    /// 23: explicitly scalared (boolean)
+    ExplicitScalared = vpi_sys::vpiExplicitScalared as i32,
+    /// 24: explicitly vectored (boolean)
+    ExplicitVectored = vpi_sys::vpiExplicitVectored as i32,
+    /// 25: expanded vector net (boolean)
+    Expanded = vpi_sys::vpiExpanded as i32,
+    /// 26: implicitly declared net (boolean)
+    ImplicitDecl = vpi_sys::vpiImplicitDecl as i32,
+    /// 27: charge decay strength of net
+    ChargeStrength = vpi_sys::vpiChargeStrength as i32,
+    /// 28: variable array (boolean)
+    Array = vpi_sys::vpiArray as i32,
+    /// 29: port index
+    PortIndex = vpi_sys::vpiPortIndex as i32,
 
     // Gate and terminal properties (30-40)
-    // GAP: 30 = vpiTermIndex (index of primitive terminal)
-    // GAP: 31 = vpiStrength0 (0-strength of net or gate)
-    // GAP: 32 = vpiStrength1 (1-strength of net or gate)
-    // GAP: 33 = vpiPrimType (primitive subtypes)
-    Polarity = vpi_sys::vpiPolarity as i32,                  // 34: polarity of module path
-    DataPolarity = vpi_sys::vpiDataPolarity as i32,          // 35: data path polarity
-    Edge = vpi_sys::vpiEdge as i32,                          // 36: edge type of module path
-    // GAP: 37 = vpiPathType (path delay connection subtypes)
-    TchkType = vpi_sys::vpiTchkType as i32,                  // 38: timing check subtypes
-    // GAP: 39 = vpiOpType (operation subtypes, see OpType enum)
-    ConstType = vpi_sys::vpiConstType as i32,                // 40: constant subtypes
+    /// 30: index of primitive terminal
+    TermIndex = vpi_sys::vpiTermIndex as i32,
+    /// 31: 0-strength of net or gate
+    Strength0 = vpi_sys::vpiStrength0 as i32,
+    /// 32: 1-strength of net or gate
+    Strength1 = vpi_sys::vpiStrength1 as i32,
+    /// 33: primitive subtypes
+    PrimType = vpi_sys::vpiPrimType as i32,
+    /// 34: polarity of module path
+    Polarity = vpi_sys::vpiPolarity as i32,
+    /// 35: data path polarity
+    DataPolarity = vpi_sys::vpiDataPolarity as i32,
+    /// 36: edge type of module path
+    Edge = vpi_sys::vpiEdge as i32,
+    /// 37: path delay connection subtypes
+    PathType = vpi_sys::vpiPathType as i32,
+    /// 38: timing check subtypes
+    TchkType = vpi_sys::vpiTchkType as i32,
+    /// 39: operation subtypes (see `OpType` enum)
+    OpType = vpi_sys::vpiOpType as i32,
+    /// 40: constant subtypes
+    ConstType = vpi_sys::vpiConstType as i32,
 
     // Additional properties (41-70)
-    // GAP: 41 = vpiBlocking (blocking assignment, boolean)
-    // GAP: 42 = vpiCaseType (case statement subtypes)
-    // GAP: 43 = vpiNetDeclAssign (assign part of decl, boolean)
-    FuncType = vpi_sys::vpiFuncType as i32,                  // 44: HDL function & system function type
-    UserDefn = vpi_sys::vpiUserDefn as i32,                  // 45: user-defined system task/func (boolean)
-    // GAP: 46 = vpiScheduled (object still scheduled, boolean)
-    // GAP: 47 = vpiDefDelayMode (default delay mode for a module)
-    // GAP: 48 = vpiDefDecayTime (default decay time for a module)
-    // GAP: 49 = vpiActive (reentrant task/func frame is active)
-    Automatic = vpi_sys::vpiAutomatic as i32,                // 50: task/func object is automatic
-    // GAP: 51 = vpiCell (configuration cell)
-    // GAP: 52 = vpiConfig (configuration config file)
-    ConstantSelect = vpi_sys::vpiConstantSelect as i32,      // 53: bit-select/part-select indices are constant
-    // GAP: 54 = vpiDecompile (decompile the object)
-    // GAP: 55 = vpiDefAttribute (attribute defined for the object)
-    // GAP: 56 = vpiDelayType (delay subtype)
-    // GAP: 57 = vpiIteratorType (object type of an iterator)
-    // GAP: 58 = vpiLibrary (configuration library)
-    // GAP: 59 = vpiMultiArray (object is a multidimensional array)
-    // GAP: 60 = vpiOffset (offset from LSB)
-    // GAP: 61 = vpiResolvedNetType (net subtype after resolution)
-    // GAP: 62 = vpiSaveRestartID (unique ID for save/restart data)
-    // GAP: 63 = vpiSaveRestartLocation (name of save/restart data file)
-    // GAP: 64 = vpiValid (reentrant task/func frame is valid)
-    Signed = vpi_sys::vpiSigned as i32,                      // 65: true for signed objects
-    // GAP: 66 = vpiStop (execute simulator's $stop, control operation)
-    // GAP: 67 = vpiFinish (execute simulator's $finish, control operation)
-    // GAP: 68 = vpiReset (execute simulator's $reset, control operation)
-    // GAP: 69 = vpiSetInteractiveScope (set simulator's interactive scope)
-    LocalParam = vpi_sys::vpiLocalParam as i32,              // 70: true when a param is declared as localparam
+    /// 41: blocking assignment (boolean)
+    Blocking = vpi_sys::vpiBlocking as i32,
+    /// 42: case statement subtypes
+    CaseType = vpi_sys::vpiCaseType as i32,
+    /// 43: assign part of decl (boolean)
+    NetDeclAssign = vpi_sys::vpiNetDeclAssign as i32,
+    /// 44: HDL function & system function type
+    FuncType = vpi_sys::vpiFuncType as i32,
+    /// 45: user-defined system task/func (boolean)
+    UserDefn = vpi_sys::vpiUserDefn as i32,
+    /// 46: object still scheduled (boolean)
+    Scheduled = vpi_sys::vpiScheduled as i32,
+    /// 47: default delay mode for a module
+    DefDelayMode = vpi_sys::vpiDefDelayMode as i32,
+    /// 48: default decay time for a module
+    DefDecayTime = vpi_sys::vpiDefDecayTime as i32,
+    /// 49: reentrant task/func frame is active
+    Active = vpi_sys::vpiActive as i32,
+    /// 50: task/func object is automatic
+    Automatic = vpi_sys::vpiAutomatic as i32,
+    /// 51: configuration cell
+    Cell = vpi_sys::vpiCell as i32,
+    /// 52: configuration config file
+    Config = vpi_sys::vpiConfig as i32,
+    /// 53: bit-select/part-select indices are constant
+    ConstantSelect = vpi_sys::vpiConstantSelect as i32,
+    /// 54: decompile the object
+    Decompile = vpi_sys::vpiDecompile as i32,
+    /// 55: attribute defined for the object
+    DefAttribute = vpi_sys::vpiDefAttribute as i32,
+    /// 56: delay subtype
+    DelayType = vpi_sys::vpiDelayType as i32,
+    /// 57: object type of an iterator
+    IteratorType = vpi_sys::vpiIteratorType as i32,
+    /// 58: configuration library
+    Library = vpi_sys::vpiLibrary as i32,
+    /// 59: object is a multidimensional array
+    MultiArray = vpi_sys::vpiMultiArray as i32,
+    /// 60: offset from LSB
+    Offset = vpi_sys::vpiOffset as i32,
+    /// 61: net subtype after resolution
+    Resolved = vpi_sys::vpiResolvedNetType as i32,
+    /// 62: unique ID for save/restart data
+    SaveRestartID = vpi_sys::vpiSaveRestartID as i32,
+    /// 63: name of save/restart data file
+    SaveRestartLocation = vpi_sys::vpiSaveRestartLocation as i32,
+    /// 64: reentrant task/func frame is valid
+    Valid = vpi_sys::vpiValid as i32,
+    /// 65: true for signed objects
+    Signed = vpi_sys::vpiSigned as i32,
+    /// 66: execute simulator's $stop, control operation
+    Stop = vpi_sys::vpiStop as i32,
+    /// 67: execute simulator's $finish, control operation
+    Finish = vpi_sys::vpiFinish as i32,
+    /// 68: execute simulator's $reset, control operation
+    Reset = vpi_sys::vpiReset as i32,
+    /// 69: set simulator's interactive scope
+    SetInteractiveScope = vpi_sys::vpiSetInteractiveScope as i32,
+    /// 70: true when a param is declared as localparam
+    LocalParam = vpi_sys::vpiLocalParam as i32,
 
     // Extended properties (71-74, added with 1364-2001 and 1364-2005)
-    // GAP: 71 = vpiModPathHasIfNone (Mod path has an ifnone statement)
-    // GAP: 72 = vpiIndexedPartSelectType (Indexed part-select type)
-    // GAP: 73 = vpiIsMemory (TRUE for a one-dimensional reg array)
-    // GAP: 74 = vpiIsProtected (TRUE for protected design information)
+    /// 71: Mod path has an ifnone statement
+    ModPathHasIfNone = vpi_sys::vpiModPathHasIfNone as i32,
+    /// 72: Indexed part-select type
+    IndexedPartSelectType = vpi_sys::vpiIndexedPartSelectType as i32,
+    /// 73: TRUE for a one-dimensional reg array
+    IsMemory = vpi_sys::vpiIsMemory as i32,
+    /// 74: TRUE for protected design information
+    IsProtected = vpi_sys::vpiIsProtected as i32,
 }
 
 impl Property {
@@ -221,67 +295,114 @@ pub enum TchkType {
 #[repr(u32)]
 pub enum OpType {
     // Unary operators (1-10)
-    Minus = vpi_sys::vpiMinusOp,                    // 1: unary minus
-    Plus = vpi_sys::vpiPlusOp,                      // 2: unary plus
-    Not = vpi_sys::vpiNotOp,                        // 3: unary logical not
-    BitNeg = vpi_sys::vpiBitNegOp,                  // 4: unary bitwise negation
-    UnaryAnd = vpi_sys::vpiUnaryAndOp,              // 5: bitwise reduction AND
-    UnaryNand = vpi_sys::vpiUnaryNandOp,            // 6: bitwise reduction NAND
-    UnaryOr = vpi_sys::vpiUnaryOrOp,                // 7: bitwise reduction OR
-    UnaryNor = vpi_sys::vpiUnaryNorOp,              // 8: bitwise reduction NOR
-    UnaryXor = vpi_sys::vpiUnaryXorOp,              // 9: bitwise reduction XOR
-    UnaryXnor = vpi_sys::vpiUnaryXnorOp,            // 10: bitwise reduction XNOR
+    /// 1: unary minus
+    Minus = vpi_sys::vpiMinusOp,
+    /// 2: unary plus
+    Plus = vpi_sys::vpiPlusOp,
+    /// 3: unary logical not
+    Not = vpi_sys::vpiNotOp,
+    /// 4: unary bitwise negation
+    BitNeg = vpi_sys::vpiBitNegOp,
+    /// 5: bitwise reduction AND
+    UnaryAnd = vpi_sys::vpiUnaryAndOp,
+    /// 6: bitwise reduction NAND
+    UnaryNand = vpi_sys::vpiUnaryNandOp,
+    /// 7: bitwise reduction OR
+    UnaryOr = vpi_sys::vpiUnaryOrOp,
+    /// 8: bitwise reduction NOR
+    UnaryNor = vpi_sys::vpiUnaryNorOp,
+    /// 9: bitwise reduction XOR
+    UnaryXor = vpi_sys::vpiUnaryXorOp,
+    /// 10: bitwise reduction XNOR
+    UnaryXNor = vpi_sys::vpiUnaryXNorOp,
 
     // Binary arithmetic operators (11-25)
-    Sub = vpi_sys::vpiSubOp,                        // 11: binary subtraction
-    Div = vpi_sys::vpiDivOp,                        // 12: binary division
-    Mod = vpi_sys::vpiModOp,                        // 13: binary modulus
+    /// 11: binary subtraction
+    Sub = vpi_sys::vpiSubOp,
+    /// 12: binary division
+    Div = vpi_sys::vpiDivOp,
+    /// 13: binary modulus
+    Mod = vpi_sys::vpiModOp,
 
     // Comparison operators (14-21)
-    Eq = vpi_sys::vpiEqOp,                          // 14: equality
-    Neq = vpi_sys::vpiNeqOp,                        // 15: inequality
-    CaseEq = vpi_sys::vpiCaseEqOp,                  // 16: case equality (x and z aware)
-    CaseNeq = vpi_sys::vpiCaseNeqOp,                // 17: case inequality
-    Gt = vpi_sys::vpiGtOp,                          // 18: greater than
-    Ge = vpi_sys::vpiGeOp,                          // 19: greater than or equal
-    Lt = vpi_sys::vpiLtOp,                          // 20: less than
-    Le = vpi_sys::vpiLeOp,                          // 21: less than or equal
+    /// 14: equality
+    Eq = vpi_sys::vpiEqOp,
+    /// 15: inequality
+    Neq = vpi_sys::vpiNeqOp,
+    /// 16: case equality (x and z aware)
+    CaseEq = vpi_sys::vpiCaseEqOp,
+    /// 17: case inequality
+    CaseNeq = vpi_sys::vpiCaseNeqOp,
+    /// 18: greater than
+    Gt = vpi_sys::vpiGtOp,
+    /// 19: greater than or equal
+    Ge = vpi_sys::vpiGeOp,
+    /// 20: less than
+    Lt = vpi_sys::vpiLtOp,
+    /// 21: less than or equal
+    Le = vpi_sys::vpiLeOp,
 
     // Shift operators (22-23)
-    LShift = vpi_sys::vpiLShiftOp,                  // 22: left shift
-    RShift = vpi_sys::vpiRShiftOp,                  // 23: right shift
+    /// 22: left shift
+    LShift = vpi_sys::vpiLShiftOp,
+    /// 23: right shift
+    RShift = vpi_sys::vpiRShiftOp,
 
     // Arithmetic operators (24-25)
-    Add = vpi_sys::vpiAddOp,                        // 24: addition
-    Mult = vpi_sys::vpiMultOp,                      // 25: multiplication
+    /// 24: addition
+    Add = vpi_sys::vpiAddOp,
+    /// 25: multiplication
+    Mult = vpi_sys::vpiMultOp,
 
     // Logical operators (26-27)
-    LogAnd = vpi_sys::vpiLogAndOp,                  // 26: logical AND
-    LogOr = vpi_sys::vpiLogOrOp,                    // 27: logical OR
+    /// 26: logical AND
+    LogAnd = vpi_sys::vpiLogAndOp,
+    /// 27: logical OR
+    LogOr = vpi_sys::vpiLogOrOp,
 
     // Bitwise operators (28-31)
-    BitAnd = vpi_sys::vpiBitAndOp,                  // 28: bitwise AND
-    BitOr = vpi_sys::vpiBitOrOp,                    // 29: bitwise OR
-    BitXor = vpi_sys::vpiBitXorOp,                  // 30: bitwise XOR
-    BitXnor = vpi_sys::vpiBitXNorOp,                // 31: bitwise XNOR
+    /// 28: bitwise AND
+    BitAnd = vpi_sys::vpiBitAndOp,
+    /// 29: bitwise OR
+    BitOr = vpi_sys::vpiBitOrOp,
+    /// 30: bitwise XOR
+    BitXor = vpi_sys::vpiBitXorOp,
+    /// 31: bitwise XNOR
+    BitXnor = vpi_sys::vpiBitXNorOp,
 
     // Ternary and higher operators (32-40)
-    Condition = vpi_sys::vpiConditionOp,            // 32: ternary conditional (? :)
-    Concat = vpi_sys::vpiConcatOp,                  // 33: concatenation
-    MultiConcat = vpi_sys::vpiMultiConcatOp,        // 34: repeated concatenation
-    EventOr = vpi_sys::vpiEventOrOp,                // 35: event OR
-    Null = vpi_sys::vpiNullOp,                      // 36: null operation
-    List = vpi_sys::vpiListOp,                      // 37: list of expressions
-    MinTypMax = vpi_sys::vpiMinTypMaxOp,            // 38: min:typ:max delay expression
-    Posedge = vpi_sys::vpiPosedgeOp,                // 39: posedge
-    Negedge = vpi_sys::vpiNegedgeOp,                // 40: negedge
+    /// 32: ternary conditional (? :)
+    Condition = vpi_sys::vpiConditionOp,
+    /// 33: concatenation
+    Concat = vpi_sys::vpiConcatOp,
+    /// 34: repeated concatenation
+    MultiConcat = vpi_sys::vpiMultiConcatOp,
+    /// 35: event OR
+    EventOr = vpi_sys::vpiEventOrOp,
+    /// 36: null operation
+    Null = vpi_sys::vpiNullOp,
+    /// 37: list of expressions
+    List = vpi_sys::vpiListOp,
+    /// 38: min:typ:max delay expression
+    MinTypMax = vpi_sys::vpiMinTypMaxOp,
+    /// 39: posedge
+    Posedge = vpi_sys::vpiPosedgeOp,
+    /// 40: negedge
+    Negedge = vpi_sys::vpiNegedgeOp,
 
     // Power and arithmetic shifts (41-43)
-    ArithLShift = vpi_sys::vpiArithLShiftOp,        // 41: arithmetic left shift
-    ArithRShift = vpi_sys::vpiArithRShiftOp,        // 42: arithmetic right shift
-    Power = vpi_sys::vpiPowerOp,                    // 43: power/exponentiation
+    /// 41: arithmetic left shift
+    ArithLShift = vpi_sys::vpiArithLShiftOp,
+    /// 42: arithmetic right shift
+    ArithRShift = vpi_sys::vpiArithRShiftOp,
+    /// 43: power/exponentiation
+    Power = vpi_sys::vpiPowerOp,
 }
 
+impl OpType {
+    #[allow(non_upper_case_globals)]
+    pub const BitXNor: Self = OpType::BitXnor;
+}
 
 impl Handle {
     #[must_use]
@@ -318,7 +439,26 @@ impl Handle {
             return None;
         }
         match property {
-            Property::TopModule | Property::CellInstance => unsafe {
+            Property::TopModule
+            | Property::CellInstance
+            | Property::Protected
+            | Property::Scalar
+            | Property::Vector
+            | Property::ExplicitName
+            | Property::ConnByName
+            | Property::ExplicitScalared
+            | Property::ExplicitVectored
+            | Property::Expanded
+            | Property::ImplicitDecl
+            | Property::Array
+            | Property::Blocking
+            | Property::UserDefn
+            | Property::Scheduled
+            | Property::Signed
+            | Property::LocalParam
+            | Property::ModPathHasIfNone
+            | Property::IsMemory
+            | Property::IsProtected => unsafe {
                 let value = vpi_sys::vpi_get(property as i32, self.as_raw());
                 Some(value != 0)
             },
@@ -326,6 +466,7 @@ impl Handle {
         }
     }
 
+    #[must_use]
     pub fn get_direction(&self) -> Option<Direction> {
         if self.is_null() {
             return None;

@@ -53,10 +53,11 @@ impl Handle {
         Self { handle: raw }
     }
 
+    #[must_use]
     pub fn handle_by_name(name: &str) -> Self {
         let c_name = std::ffi::CString::new(name).expect("CString::new failed");
         let handle = unsafe {
-            vpi_sys::vpi_handle_by_name(c_name.as_ptr() as *mut i8, std::ptr::null_mut())
+            vpi_sys::vpi_handle_by_name(c_name.as_ptr().cast_mut(), std::ptr::null_mut())
         };
         Self::from_raw(handle)
     }
