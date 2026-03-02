@@ -7,6 +7,14 @@ pub struct MCD {
 pub static MCD_STDOUT: MCD = MCD { mask: 0x1 };
 
 impl MCD {
+    /// Create a new MCD with given filename.
+    pub fn new(filename: impl AsRef<str>) -> Self {
+        let c_filename = CString::new(filename.as_ref()).unwrap();
+        let mask = unsafe { vpi_sys::vpi_mcd_open(c_filename.as_ptr().cast_mut()) };
+        Self { mask }
+    }
+
+    /// Write a message to the MCD.
     pub fn write(&self, msg: impl AsRef<str>) {
         let cstr = CString::new(msg.as_ref()).unwrap();
         unsafe {
@@ -14,18 +22,19 @@ impl MCD {
         }
     }
 
-    pub fn open(filename: impl AsRef<str>) -> Self {
-        let c_filename = crate::string_to_ascii_cstring(filename);
-        let mask = unsafe { vpi_sys::vpi_mcd_open(c_filename.as_ptr().cast_mut()) };
-        Self { mask }
+    /// Write a message with a newline to the MCD.
+    pub fn writeln(&self, msg: impl AsRef<str>) {
+        self.write(&format!("{}\n", msg.as_ref()));
     }
 
+    /// Close the MCD.
     pub fn close(&self) {
         unsafe {
             vpi_sys::vpi_mcd_close(self.mask);
         }
     }
 
+    /// Flush the MCD output.
     pub fn flush(&self) {
         unsafe {
             vpi_sys::vpi_mcd_flush(self.mask);
@@ -33,6 +42,7 @@ impl MCD {
     }
 
     #[must_use]
+    /// Get the filename associated with this MCD, if any.
     pub fn file_name(&self) -> Option<String> {
         let ptr = unsafe { vpi_sys::vpi_mcd_name(self.mask) };
         if ptr.is_null() {
@@ -57,6 +67,6 @@ impl std::ops::BitOr for MCD {
 #[macro_export]
 macro_rules! mcd_println {
     ($mcd:expr, $($arg:tt)*) => {{
-        $mcd.write(&format!("{}\n", format!($($arg)*)));
+        $mcd.writeln(&format!($($arg)*));
     }}
 }
