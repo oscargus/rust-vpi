@@ -7,3 +7,7 @@ rust-version = "1.82"
 
 [build-dependencies]
 bindgen.workspace = true
+
+[features]
+default = []
+sv = []

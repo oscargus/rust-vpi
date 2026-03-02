@@ -165,6 +165,143 @@ pub enum Property {
     IsMemory = vpi_sys::vpiIsMemory as i32,
     /// 74: TRUE for protected design information
     IsProtected = vpi_sys::vpiIsProtected as i32,
+
+    #[cfg(feature = "sv")]
+    // SystemVerilog properties (600-670)
+    /// 600: top-level module
+    Top = vpi_sys::vpiTop as i32,
+    #[cfg(feature = "sv")]
+    /// 602: design unit (package, module, etc.)
+    Unit = vpi_sys::vpiUnit as i32,
+    #[cfg(feature = "sv")]
+    /// 603: join type of fork-join block
+    JoinType = vpi_sys::vpiJoinType as i32,
+    #[cfg(feature = "sv")]
+    /// 604: access type (fork-join, extern, DPI)
+    AccessType = vpi_sys::vpiAccessType as i32,
+    #[cfg(feature = "sv")]
+    /// 606: array type (static, dynamic, associative, queue)
+    ArrayType = vpi_sys::vpiArrayType as i32,
+    #[cfg(feature = "sv")]
+    /// 607: array member
+    ArrayMember = vpi_sys::vpiArrayMember as i32,
+    #[cfg(feature = "sv")]
+    /// 608: object is randomized
+    IsRandomized = vpi_sys::vpiIsRandomized as i32,
+    #[cfg(feature = "sv")]
+    /// 609: local variable declarations
+    LocalVarDecls = vpi_sys::vpiLocalVarDecls as i32,
+    #[cfg(feature = "sv")]
+    /// 610: randomization type (rand, randc, not_rand)
+    RandType = vpi_sys::vpiRandType as i32,
+    #[cfg(feature = "sv")]
+    /// 611: interface or modport port type
+    PortType = vpi_sys::vpiPortType as i32,
+    #[cfg(feature = "sv")]
+    /// 612: variable is a constant
+    ConstantVariable = vpi_sys::vpiConstantVariable as i32,
+    #[cfg(feature = "sv")]
+    /// 615: struct/union member
+    StructUnionMember = vpi_sys::vpiStructUnionMember as i32,
+    #[cfg(feature = "sv")]
+    /// 620: visibility of class member (public, protected, local)
+    Visibility = vpi_sys::vpiVisibility as i32,
+    #[cfg(feature = "sv")]
+    /// 624: always block type (always_comb, always_ff, always_latch)
+    AlwaysType = vpi_sys::vpiAlwaysType as i32,
+    #[cfg(feature = "sv")]
+    /// 625: distribution constraint type
+    DistType = vpi_sys::vpiDistType as i32,
+    #[cfg(feature = "sv")]
+    /// 630: data is packed
+    Packed = vpi_sys::vpiPacked as i32,
+    #[cfg(feature = "sv")]
+    /// 632: tagged union or type
+    Tagged = vpi_sys::vpiTagged as i32,
+    #[cfg(feature = "sv")]
+    /// 635: class is virtual
+    Virtual = vpi_sys::vpiVirtual as i32,
+    #[cfg(feature = "sv")]
+    /// 636: class has actual object
+    HasActual = vpi_sys::vpiHasActual as i32,
+    #[cfg(feature = "sv")]
+    /// 638: constraint is enabled
+    IsConstraintEnabled = vpi_sys::vpiIsConstraintEnabled as i32,
+    #[cfg(feature = "sv")]
+    /// 639: constraint is soft
+    Soft = vpi_sys::vpiSoft as i32,
+    #[cfg(feature = "sv")]
+    /// 640: type of built-in class
+    ClassType = vpi_sys::vpiClassType as i32,
+    #[cfg(feature = "sv")]
+    /// 645: is a class method
+    Method = vpi_sys::vpiMethod as i32,
+    #[cfg(feature = "sv")]
+    /// 649: clock is inferred
+    IsClockInferred = vpi_sys::vpiIsClockInferred as i32,
+    #[cfg(feature = "sv")]
+    /// 650: qualifier for case/priority
+    Qualifier = vpi_sys::vpiQualifier as i32,
+    #[cfg(feature = "sv")]
+    /// 651: input edge type
+    InputEdge = vpi_sys::vpiInputEdge as i32,
+    #[cfg(feature = "sv")]
+    /// 652: output edge type
+    OutputEdge = vpi_sys::vpiOutputEdge as i32,
+    #[cfg(feature = "sv")]
+    /// 653: is generic module
+    Generic = vpi_sys::vpiGeneric as i32,
+    #[cfg(feature = "sv")]
+    /// 654: compatibility mode
+    CompatibilityMode = vpi_sys::vpiCompatibilityMode as i32,
+    #[cfg(feature = "sv")]
+    /// 655: packed array member
+    PackedArrayMember = vpi_sys::vpiPackedArrayMember as i32,
+    #[cfg(feature = "sv")]
+    /// 656: strength of temporal operator
+    OpStrong = vpi_sys::vpiOpStrong as i32,
+    #[cfg(feature = "sv")]
+    /// 657: deferred assertion
+    IsDeferred = vpi_sys::vpiIsDeferred as i32,
+    #[cfg(feature = "sv")]
+    /// 658: memory allocation scheme
+    AllocScheme = vpi_sys::vpiAllocScheme as i32,
+    #[cfg(feature = "sv")]
+    /// 659: is a cover sequence
+    IsCoverSequence = vpi_sys::vpiIsCoverSequence as i32,
+    #[cfg(feature = "sv")]
+    /// 660: unique object ID
+    ObjId = vpi_sys::vpiObjId as i32,
+    #[cfg(feature = "sv")]
+    /// 661: start line number
+    StartLine = vpi_sys::vpiStartLine as i32,
+    #[cfg(feature = "sv")]
+    /// 662: column number
+    Column = vpi_sys::vpiColumn as i32,
+    #[cfg(feature = "sv")]
+    /// 663: end line number
+    EndLine = vpi_sys::vpiEndLine as i32,
+    #[cfg(feature = "sv")]
+    /// 664: end column number
+    EndColumn = vpi_sys::vpiEndColumn as i32,
+    #[cfg(feature = "sv")]
+    /// 665: DPI pure function
+    DPIPure = vpi_sys::vpiDPIPure as i32,
+    #[cfg(feature = "sv")]
+    /// 666: DPI context function
+    DPIContext = vpi_sys::vpiDPIContext as i32,
+    #[cfg(feature = "sv")]
+    /// 667: DPI C string handling
+    DPICStr = vpi_sys::vpiDPICStr as i32,
+    #[cfg(feature = "sv")]
+    /// 668: DPI C identifier
+    DPICIdentifier = vpi_sys::vpiDPICIdentifier as i32,
+    #[cfg(feature = "sv")]
+    /// 669: is a module port
+    IsModPort = vpi_sys::vpiIsModPort as i32,
+    #[cfg(feature = "sv")]
+    /// 670: is a final block
+    IsFinal = vpi_sys::vpiIsFinal as i32,
 }
 
 impl Property {
@@ -226,6 +363,16 @@ pub enum ConstType {
     Real = vpi_sys::vpiRealConst,
     String = vpi_sys::vpiStringConst,
     Time = vpi_sys::vpiTimeConst,
+
+    #[cfg(feature = "sv")]
+    /// one-step constant expression (added with 1800-2005)
+    OneStep = vpi_sys::vpiOneStepConst,
+    #[cfg(feature = "sv")]
+    /// unbounded constant (added with 1800-2005)
+    Unbounded = vpi_sys::vpiUnboundedConst,
+    #[cfg(feature = "sv")]
+    /// null constant (added with 1800-2005)
+    Null = vpi_sys::vpiNullConst,
 }
 
 #[repr(u32)]
@@ -236,6 +383,8 @@ pub enum FuncType {
     Time = vpi_sys::vpiTimeFunc,
     Sized = vpi_sys::vpiSizedFunc,
     SizedSigned = vpi_sys::vpiSizedSignedFunc,
+    #[cfg(feature = "sv")]
+    Other = vpi_sys::vpiOtherFunc,
 }
 
 #[repr(u32)]
@@ -454,6 +603,146 @@ pub enum OpType {
     ArithRShift = vpi_sys::vpiArithRShiftOp,
     /// 43: power/exponentiation
     Power = vpi_sys::vpiPowerOp,
+
+    #[cfg(feature = "sv")]
+    // SystemVerilog sequence and property operators (50-98)
+    /// 50: implication operator (->)
+    Imply = vpi_sys::vpiImplyOp,
+    #[cfg(feature = "sv")]
+    /// 51: non-overlapping implication operator (|=>)
+    NonOverlapImply = vpi_sys::vpiNonOverlapImplyOp,
+    #[cfg(feature = "sv")]
+    /// 52: overlapping implication operator (|->)
+    OverlapImply = vpi_sys::vpiOverlapImplyOp,
+    #[cfg(feature = "sv")]
+    /// 53: unary cycle delay operator (##)
+    UnaryCycleDelay = vpi_sys::vpiUnaryCycleDelayOp,
+    #[cfg(feature = "sv")]
+    /// 54: binary cycle delay operator (##)
+    CycleDelay = vpi_sys::vpiCycleDelayOp,
+    #[cfg(feature = "sv")]
+    /// 55: sequence intersection operator
+    Intersect = vpi_sys::vpiIntersectOp,
+    #[cfg(feature = "sv")]
+    /// 56: first_match operator
+    FirstMatch = vpi_sys::vpiFirstMatchOp,
+    #[cfg(feature = "sv")]
+    /// 57: throughout operator
+    Throughout = vpi_sys::vpiThroughoutOp,
+    #[cfg(feature = "sv")]
+    /// 58: within operator
+    Within = vpi_sys::vpiWithinOp,
+    #[cfg(feature = "sv")]
+    /// 59: non-consecutive repetition operator ([=])
+    Repeat = vpi_sys::vpiRepeatOp,
+    #[cfg(feature = "sv")]
+    /// 60: consecutive repetition operator ([*])
+    ConsecutiveRepeat = vpi_sys::vpiConsecutiveRepeatOp,
+    #[cfg(feature = "sv")]
+    /// 61: goto repetition operator ([->])
+    GotoRepeat = vpi_sys::vpiGotoRepeatOp,
+    #[cfg(feature = "sv")]
+    /// 62: post-increment operator (++)
+    PostInc = vpi_sys::vpiPostIncOp,
+    #[cfg(feature = "sv")]
+    /// 63: pre-increment operator (++)
+    PreInc = vpi_sys::vpiPreIncOp,
+    #[cfg(feature = "sv")]
+    /// 64: post-decrement operator (--)
+    PostDec = vpi_sys::vpiPostDecOp,
+    #[cfg(feature = "sv")]
+    /// 65: pre-decrement operator (--)
+    PreDec = vpi_sys::vpiPreDecOp,
+    #[cfg(feature = "sv")]
+    /// 66: match operator
+    Match = vpi_sys::vpiMatchOp,
+    #[cfg(feature = "sv")]
+    /// 67: type cast operator (type'())
+    Cast = vpi_sys::vpiCastOp,
+    #[cfg(feature = "sv")]
+    /// 68: iff operator
+    Iff = vpi_sys::vpiIffOp,
+    #[cfg(feature = "sv")]
+    /// 69: wildcard equality operator (==?)
+    WildEq = vpi_sys::vpiWildEqOp,
+    #[cfg(feature = "sv")]
+    /// 70: wildcard inequality operator (!=?)
+    WildNeq = vpi_sys::vpiWildNeqOp,
+    #[cfg(feature = "sv")]
+    /// 71: left-to-right streaming operator ({>>})
+    StreamLR = vpi_sys::vpiStreamLROp,
+    #[cfg(feature = "sv")]
+    /// 72: right-to-left streaming operator ({<<})
+    StreamRL = vpi_sys::vpiStreamRLOp,
+    #[cfg(feature = "sv")]
+    /// 73: .matched sequence operation
+    Matched = vpi_sys::vpiMatchedOp,
+    #[cfg(feature = "sv")]
+    /// 74: .triggered sequence operation
+    Triggered = vpi_sys::vpiTriggeredOp,
+    #[cfg(feature = "sv")]
+    /// 75: assignment pattern operator ('{}）
+    AssignmentPattern = vpi_sys::vpiAssignmentPatternOp,
+    #[cfg(feature = "sv")]
+    /// 76: multi-assignment pattern operator ('{n{}})
+    MultiAssignmentPattern = vpi_sys::vpiMultiAssignmentPatternOp,
+    #[cfg(feature = "sv")]
+    /// 77: if operator
+    If = vpi_sys::vpiIfOp,
+    #[cfg(feature = "sv")]
+    /// 78: if-else operator
+    IfElse = vpi_sys::vpiIfElseOp,
+    #[cfg(feature = "sv")]
+    /// 79: composite and operator
+    CompAnd = vpi_sys::vpiCompAndOp,
+    #[cfg(feature = "sv")]
+    /// 80: composite or operator
+    CompOr = vpi_sys::vpiCompOrOp,
+    #[cfg(feature = "sv")]
+    /// 81: type operator
+    Type = vpi_sys::vpiTypeOp,
+    #[cfg(feature = "sv")]
+    /// 82: assignment operator
+    Assignment = vpi_sys::vpiAssignmentOp,
+    #[cfg(feature = "sv")]
+    /// 83: accept_on operator
+    AcceptOn = vpi_sys::vpiAcceptOnOp,
+    #[cfg(feature = "sv")]
+    /// 84: reject_on operator
+    RejectOn = vpi_sys::vpiRejectOnOp,
+    #[cfg(feature = "sv")]
+    /// 85: sync_accept_on operator
+    SyncAcceptOn = vpi_sys::vpiSyncAcceptOnOp,
+    #[cfg(feature = "sv")]
+    /// 86: sync_reject_on operator
+    SyncRejectOn = vpi_sys::vpiSyncRejectOnOp,
+    #[cfg(feature = "sv")]
+    /// 87: overlapped followed_by operator (|=>)
+    OverlapFollowedBy = vpi_sys::vpiOverlapFollowedByOp,
+    #[cfg(feature = "sv")]
+    /// 88: non-overlapped followed_by operator (|->)
+    NonOverlapFollowedBy = vpi_sys::vpiNonOverlapFollowedByOp,
+    #[cfg(feature = "sv")]
+    /// 89: nexttime operator
+    Nexttime = vpi_sys::vpiNexttimeOp,
+    #[cfg(feature = "sv")]
+    /// 90: always operator
+    Always = vpi_sys::vpiAlwaysOp,
+    #[cfg(feature = "sv")]
+    /// 91: eventually operator
+    Eventually = vpi_sys::vpiEventuallyOp,
+    #[cfg(feature = "sv")]
+    /// 92: until operator
+    Until = vpi_sys::vpiUntilOp,
+    #[cfg(feature = "sv")]
+    /// 93: until_with operator
+    UntilWith = vpi_sys::vpiUntilWithOp,
+    #[cfg(feature = "sv")]
+    /// 94: implies operator
+    Implies = vpi_sys::vpiImpliesOp,
+    #[cfg(feature = "sv")]
+    /// 95: inside operator
+    Inside = vpi_sys::vpiInsideOp,
 }
 
 impl OpType {

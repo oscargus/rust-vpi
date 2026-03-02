@@ -13,3 +13,7 @@ bitflags.workspace = true
 num-derive.workspace = true
 num-traits.workspace = true
 vpi-sys.workspace = true
+
+[features]
+default = []
+sv = ["vpi-sys/sv"]

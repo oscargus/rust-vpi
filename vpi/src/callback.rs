@@ -33,6 +33,135 @@ pub enum CbReason {
     Signal = vpi_sys::cbSignal,
     NBASynch = vpi_sys::cbNBASynch,
     AtEndOfSimTime = vpi_sys::cbAtEndOfSimTime,
+
+    #[cfg(feature = "sv")]
+    // SystemVerilog thread callbacks (600-605)
+    /// callback on thread creation
+    StartOfThread = vpi_sys::cbStartOfThread,
+    #[cfg(feature = "sv")]
+    /// callback on thread termination
+    EndOfThread = vpi_sys::cbEndOfThread,
+    #[cfg(feature = "sv")]
+    /// callback on reentering thread
+    EnterThread = vpi_sys::cbEnterThread,
+    #[cfg(feature = "sv")]
+    /// callback on frame creation
+    StartOfFrame = vpi_sys::cbStartOfFrame,
+    #[cfg(feature = "sv")]
+    /// callback on frame exit
+    EndOfFrame = vpi_sys::cbEndOfFrame,
+    #[cfg(feature = "sv")]
+    /// callback on array variable size change
+    SizeChange = vpi_sys::cbSizeChange,
+
+    #[cfg(feature = "sv")]
+    // SystemVerilog assertion callbacks (606-662)
+    /// assertion starts
+    AssertionStart = vpi_sys::cbAssertionStart,
+    #[cfg(feature = "sv")]
+    /// assertion succeeds
+    AssertionSuccess = vpi_sys::cbAssertionSuccess,
+    #[cfg(feature = "sv")]
+    /// assertion fails
+    AssertionFailure = vpi_sys::cbAssertionFailure,
+    #[cfg(feature = "sv")]
+    /// assertion step succeeds
+    AssertionStepSuccess = vpi_sys::cbAssertionStepSuccess,
+    #[cfg(feature = "sv")]
+    /// assertion step fails
+    AssertionStepFailure = vpi_sys::cbAssertionStepFailure,
+    #[cfg(feature = "sv")]
+    /// assertion disabled
+    AssertionDisable = vpi_sys::cbAssertionDisable,
+    #[cfg(feature = "sv")]
+    /// assertion enabled
+    AssertionEnable = vpi_sys::cbAssertionEnable,
+    #[cfg(feature = "sv")]
+    /// assertion reset
+    AssertionReset = vpi_sys::cbAssertionReset,
+    #[cfg(feature = "sv")]
+    /// assertion killed
+    AssertionKill = vpi_sys::cbAssertionKill,
+    #[cfg(feature = "sv")]
+    /// assertion system initialized
+    AssertionSysInitialized = vpi_sys::cbAssertionSysInitialized,
+    #[cfg(feature = "sv")]
+    /// assertion system on
+    AssertionSysOn = vpi_sys::cbAssertionSysOn,
+    #[cfg(feature = "sv")]
+    /// assertion system off
+    AssertionSysOff = vpi_sys::cbAssertionSysOff,
+    #[cfg(feature = "sv")]
+    /// assertion system end
+    AssertionSysEnd = vpi_sys::cbAssertionSysEnd,
+    #[cfg(feature = "sv")]
+    /// assertion system reset
+    AssertionSysReset = vpi_sys::cbAssertionSysReset,
+    #[cfg(feature = "sv")]
+    /// assertion vacuous success
+    AssertionVacuousSuccess = vpi_sys::cbAssertionVacuousSuccess,
+    #[cfg(feature = "sv")]
+    /// assertion disabled evaluation
+    AssertionDisabledEvaluation = vpi_sys::cbAssertionDisabledEvaluation,
+    #[cfg(feature = "sv")]
+    /// assertion system lock
+    AssertionSysLock = vpi_sys::cbAssertionSysLock,
+    #[cfg(feature = "sv")]
+    /// assertion system unlock
+    AssertionSysUnlock = vpi_sys::cbAssertionSysUnlock,
+    #[cfg(feature = "sv")]
+    /// assertion lock
+    AssertionLock = vpi_sys::cbAssertionLock,
+    #[cfg(feature = "sv")]
+    /// assertion unlock
+    AssertionUnlock = vpi_sys::cbAssertionUnlock,
+    #[cfg(feature = "sv")]
+    /// assertion enable pass action
+    AssertionEnablePassAction = vpi_sys::cbAssertionEnablePassAction,
+    #[cfg(feature = "sv")]
+    /// assertion enable fail action
+    AssertionEnableFailAction = vpi_sys::cbAssertionEnableFailAction,
+    #[cfg(feature = "sv")]
+    /// assertion disable pass action
+    AssertionDisablePassAction = vpi_sys::cbAssertionDisablePassAction,
+    #[cfg(feature = "sv")]
+    /// assertion disable fail action
+    AssertionDisableFailAction = vpi_sys::cbAssertionDisableFailAction,
+    #[cfg(feature = "sv")]
+    /// assertion enable non-vacuous action
+    AssertionEnableNonvacuousAction = vpi_sys::cbAssertionEnableNonvacuousAction,
+    #[cfg(feature = "sv")]
+    /// assertion disable vacuous action
+    AssertionDisableVacuousAction = vpi_sys::cbAssertionDisableVacuousAction,
+    #[cfg(feature = "sv")]
+    /// assertion system enable pass action
+    AssertionSysEnablePassAction = vpi_sys::cbAssertionSysEnablePassAction,
+    #[cfg(feature = "sv")]
+    /// assertion system enable fail action
+    AssertionSysEnableFailAction = vpi_sys::cbAssertionSysEnableFailAction,
+    #[cfg(feature = "sv")]
+    /// assertion system disable pass action
+    AssertionSysDisablePassAction = vpi_sys::cbAssertionSysDisablePassAction,
+    #[cfg(feature = "sv")]
+    /// assertion system disable fail action
+    AssertionSysDisableFailAction = vpi_sys::cbAssertionSysDisableFailAction,
+    #[cfg(feature = "sv")]
+    /// assertion system enable non-vacuous action
+    AssertionSysEnableNonvacuousAction = vpi_sys::cbAssertionSysEnableNonvacuousAction,
+    #[cfg(feature = "sv")]
+    /// assertion system disable vacuous action
+    AssertionSysDisableVacuousAction = vpi_sys::cbAssertionSysDisableVacuousAction,
+
+    #[cfg(feature = "sv")]
+    // SystemVerilog object callbacks (700-702)
+    /// callback on class object creation
+    CreateObj = vpi_sys::cbCreateObj,
+    #[cfg(feature = "sv")]
+    /// callback on class object reclaimed
+    ReclaimObj = vpi_sys::cbReclaimObj,
+    #[cfg(feature = "sv")]
+    /// callback on transient object deletion
+    EndOfObject = vpi_sys::cbEndOfObject,
 }
 
 pub struct Callback {
