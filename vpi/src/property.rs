@@ -463,6 +463,25 @@ impl OpType {
 
 impl Handle {
     #[must_use]
+    pub fn get_u32(&self, property: Property) -> Option<u32> {
+        if self.is_null() {
+            return None;
+        }
+        match property {
+            Property::Size
+            | Property::LineNo
+            | Property::TimeUnit
+            | Property::TimePrecision
+            | Property::DefNetType
+            | Property::PortIndex
+            | Property::TermIndex => unsafe {
+                let value = vpi_sys::vpi_get(property as i32, self.as_raw());
+                Some(value as u32)
+            },
+            _ => None, // For simplicity, only handle common properties here
+        }
+    }
+    #[must_use]
     pub fn get_str(&self, property: Property) -> Option<String> {
         if self.is_null() {
             return None;
