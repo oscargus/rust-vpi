@@ -1,7 +1,7 @@
 use num_derive::{FromPrimitive, ToPrimitive};
 use num_traits::FromPrimitive;
 
-use crate::Handle;
+use crate::{Handle, ObjectType};
 
 #[repr(i32)]
 pub enum Property {
@@ -593,5 +593,14 @@ impl Handle {
         }
         let value = unsafe { vpi_sys::vpi_get(Property::Edge as i32, self.as_raw()) };
         Edge::from_bits(value as u32)
+    }
+
+    #[must_use]
+    pub fn get_type(&self) -> Option<ObjectType> {
+        if self.is_null() {
+            return None;
+        }
+        let value = unsafe { vpi_sys::vpi_get(Property::Type as i32, self.as_raw()) };
+        ObjectType::from_u32(value as u32)
     }
 }

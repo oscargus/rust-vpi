@@ -33,7 +33,6 @@ fn walk_hierarchy(handle: &vpi::Handle, indent: usize) {
         vpi::ObjectType::Net,
         vpi::ObjectType::Reg,
         vpi::ObjectType::Variables,
-        vpi::ObjectType::Memory,
         vpi::ObjectType::Parameter,
     ]) {
         let name = signal
