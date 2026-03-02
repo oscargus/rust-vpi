@@ -2,7 +2,7 @@
 name = "vpi"
 version.workspace = true
 edition.workspace = true
-
+rust-version = "1.82"
 
 [lib]
 name = "vpi"

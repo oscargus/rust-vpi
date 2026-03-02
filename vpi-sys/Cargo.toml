@@ -1,8 +1,9 @@
 [package]
 name = "vpi-sys"
-version = "0.1.0"
-edition = "2024"
+version.workspace = true
+edition.workspace = true
 build = "build.rs"
+rust-version = "1.82"
 
 [build-dependencies]
 bindgen.workspace = true

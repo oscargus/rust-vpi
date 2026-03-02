@@ -5,6 +5,7 @@ mod callback;
 mod control;
 mod error;
 mod handle;
+mod mcd;
 mod object;
 mod property;
 mod simulator;
@@ -17,6 +18,7 @@ pub use callback::*;
 pub use control::*;
 pub use error::*;
 pub use handle::*;
+pub use mcd::*;
 pub use object::*;
 pub use property::*;
 pub use simulator::*;
@@ -25,7 +27,7 @@ pub use value::*;
 
 pub fn printf(msg: impl AsRef<str>) {
     static FMT: &[u8] = b"%s\n\0";
-    let cstr = string_to_iso8859_1_cstring(msg);
+    let cstr = string_to_ascii_cstring(msg);
     unsafe {
         vpi_sys::vpi_printf(
             FMT.as_ptr().cast::<i8>().cast_mut(),
@@ -43,7 +45,7 @@ macro_rules! printf {
 
 /// Convert Rust string to ASCII < 128 encoded C string
 /// Characters outside of ASCII range are replaced with ?
-pub fn string_to_iso8859_1_cstring(msg: impl AsRef<str>) -> CString {
+pub fn string_to_ascii_cstring(msg: impl AsRef<str>) -> CString {
     // Convert UTF-8 string to ISO-8859-1 bytes
     let iso8859_1_bytes: Vec<u8> = msg
         .as_ref()

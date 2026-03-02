@@ -69,6 +69,12 @@ impl Handle {
             iter: Handle::from_raw(raw),
         }
     }
+
+    #[must_use]
+    pub fn handle_by_index(&self, index: i32) -> Self {
+        let handle = unsafe { vpi_sys::vpi_handle_by_index(self.as_raw(), index) };
+        Self::from_raw(handle)
+    }
 }
 
 pub struct HandleIterator {

@@ -106,6 +106,7 @@ pub enum ScalarValue {
     H = vpi_sys::vpiH,
     L = vpi_sys::vpiL,
     DontCare = vpi_sys::vpiDontCare,
+    NoChange = vpi_sys::vpiNoChange,
 }
 
 impl Display for ScalarValue {
@@ -118,6 +119,7 @@ impl Display for ScalarValue {
             ScalarValue::H => 'H',
             ScalarValue::L => 'L',
             ScalarValue::DontCare => '-',
+            ScalarValue::NoChange => 'N',
         };
         write!(f, "{char_repr}")
     }
