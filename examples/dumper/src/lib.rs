@@ -29,7 +29,13 @@ fn walk_hierarchy(handle: &vpi::Handle, indent: usize) {
     }
     vpi::printf!("\n{}Signals", " ".repeat(indent + 1));
     vpi::printf!("{}=======", " ".repeat(indent + 1));
-    for signal in handle.iterator(vpi::ObjectType::Net) {
+    for signal in handle.iterators(&[
+        vpi::ObjectType::Net,
+        vpi::ObjectType::Reg,
+        vpi::ObjectType::Variables,
+        vpi::ObjectType::Memory,
+        vpi::ObjectType::Parameter,
+    ]) {
         let name = signal
             .get_str(vpi::Property::Name)
             .unwrap_or("<unnamed>".to_string());

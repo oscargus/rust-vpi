@@ -75,6 +75,10 @@ impl Handle {
         let handle = unsafe { vpi_sys::vpi_handle_by_index(self.as_raw(), index) };
         Self::from_raw(handle)
     }
+
+    pub fn iterators<'a>(&'a self, typ: &'a [ObjectType]) -> impl Iterator<Item = Handle> + 'a {
+        typ.iter().copied().flat_map(move |t| self.iterator(t))
+    }
 }
 
 pub struct HandleIterator {

@@ -216,6 +216,7 @@ bitflags::bitflags! {
 }
 
 #[repr(u32)]
+#[derive(FromPrimitive, ToPrimitive)]
 pub enum ConstType {
     Dec = vpi_sys::vpiDecConst,
     Binary = vpi_sys::vpiBinaryConst,
@@ -228,6 +229,7 @@ pub enum ConstType {
 }
 
 #[repr(u32)]
+#[derive(FromPrimitive, ToPrimitive)]
 pub enum FuncType {
     Int = vpi_sys::vpiIntFunc,
     Real = vpi_sys::vpiRealFunc,
@@ -237,6 +239,7 @@ pub enum FuncType {
 }
 
 #[repr(u32)]
+#[derive(FromPrimitive, ToPrimitive)]
 pub enum SysFuncType {
     Int = vpi_sys::vpiSysFuncInt,
     Real = vpi_sys::vpiSysFuncReal,
@@ -245,6 +248,7 @@ pub enum SysFuncType {
 }
 
 #[repr(u32)]
+#[derive(FromPrimitive, ToPrimitive)]
 pub enum PrimType {
     // Logic gates (1-8)
     /// 1: and gate
@@ -316,6 +320,7 @@ pub enum PrimType {
 }
 
 #[repr(u32)]
+#[derive(FromPrimitive, ToPrimitive)]
 pub enum TchkType {
     /// 1: $setup timing check
     Setup = vpi_sys::vpiSetup,
@@ -344,6 +349,7 @@ pub enum TchkType {
 }
 
 #[repr(u32)]
+#[derive(FromPrimitive, ToPrimitive)]
 pub enum OpType {
     // Unary operators (1-10)
     /// 1: unary minus
@@ -524,5 +530,68 @@ impl Handle {
         }
         let value = unsafe { vpi_sys::vpi_get(Property::Direction as i32, self.as_raw()) };
         Direction::from_u32(value as u32)
+    }
+
+    #[must_use]
+    pub fn get_op_type(&self) -> Option<OpType> {
+        if self.is_null() {
+            return None;
+        }
+        let value = unsafe { vpi_sys::vpi_get(Property::OpType as i32, self.as_raw()) };
+        OpType::from_u32(value as u32)
+    }
+
+    #[must_use]
+    pub fn get_prim_type(&self) -> Option<PrimType> {
+        if self.is_null() {
+            return None;
+        }
+        let value = unsafe { vpi_sys::vpi_get(Property::PrimType as i32, self.as_raw()) };
+        PrimType::from_u32(value as u32)
+    }
+
+    #[must_use]
+    pub fn get_tchk_type(&self) -> Option<TchkType> {
+        if self.is_null() {
+            return None;
+        }
+        let value = unsafe { vpi_sys::vpi_get(Property::TchkType as i32, self.as_raw()) };
+        TchkType::from_u32(value as u32)
+    }
+
+    #[must_use]
+    pub fn get_const_type(&self) -> Option<ConstType> {
+        if self.is_null() {
+            return None;
+        }
+        let value = unsafe { vpi_sys::vpi_get(Property::ConstType as i32, self.as_raw()) };
+        ConstType::from_u32(value as u32)
+    }
+
+    #[must_use]
+    pub fn get_func_type(&self) -> Option<FuncType> {
+        if self.is_null() {
+            return None;
+        }
+        let value = unsafe { vpi_sys::vpi_get(Property::FuncType as i32, self.as_raw()) };
+        FuncType::from_u32(value as u32)
+    }
+
+    #[must_use]
+    pub fn get_sys_func_type(&self) -> Option<SysFuncType> {
+        if self.is_null() {
+            return None;
+        }
+        let value = unsafe { vpi_sys::vpi_get(Property::SysFuncType as i32, self.as_raw()) };
+        SysFuncType::from_u32(value as u32)
+    }
+
+    #[must_use]
+    pub fn get_edge(&self) -> Option<Edge> {
+        if self.is_null() {
+            return None;
+        }
+        let value = unsafe { vpi_sys::vpi_get(Property::Edge as i32, self.as_raw()) };
+        Edge::from_bits(value as u32)
     }
 }

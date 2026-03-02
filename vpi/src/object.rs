@@ -1,7 +1,7 @@
 use num_derive::{FromPrimitive, ToPrimitive};
 
 #[repr(u32)]
-#[derive(FromPrimitive, ToPrimitive)]
+#[derive(Copy, Clone, FromPrimitive, ToPrimitive)]
 pub enum ObjectType {
     /// always procedure
     Always = vpi_sys::vpiAlways,
@@ -107,7 +107,7 @@ pub enum ObjectType {
     Repeat = vpi_sys::vpiRepeat,
     /// repeat control in an assign stmt
     RepeatControl = vpi_sys::vpiRepeatControl,
-    /// vpi_put_value() event
+    /// `vpi_put_value()` event
     SchedEvent = vpi_sys::vpiSchedEvent,
     /// specparam
     SpecParam = vpi_sys::vpiSpecParam,
@@ -239,7 +239,7 @@ pub enum ObjectType {
     SwitchArray = vpi_sys::vpiSwitchArray,
     /// UDP instance array
     UdpArray = vpi_sys::vpiUdpArray,
-    /// active $timeformat() system task
+    /// active $`timeformat()` system task
     ActiveTimeFormat = vpi_sys::vpiActiveTimeFormat,
     /// To get to a delay device's drivers.
     InTerm = vpi_sys::vpiInTerm,
