@@ -24,7 +24,7 @@ impl MCD {
 
     /// Write a message with a newline to the MCD.
     pub fn writeln(&self, msg: impl AsRef<str>) {
-        self.write(&format!("{}\n", msg.as_ref()));
+        self.write(format!("{}\n", msg.as_ref()));
     }
 
     /// Close the MCD.

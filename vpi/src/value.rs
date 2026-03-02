@@ -20,6 +20,11 @@ pub enum Value {
     Time(Time),
     ObjType(u32), // Placeholder, as object types are more complex
     Suppress,
+    ShortInt(i16),
+    LongInt(i64),
+    ShortReal(f32),
+    RawTwoState(Vec<bool>),         // Each bit is either 0 or 1
+    RawFourState(Vec<ScalarValue>), // Each bit can be 0, 1, X, or Z
 }
 
 impl Display for Value {
@@ -43,6 +48,25 @@ impl Display for Value {
             Value::Time(time) => write!(f, "{time}"),
             Value::ObjType(obj_type) => write!(f, "ObjType({obj_type})"), // Placeholder
             Value::Suppress => write!(f, "Suppress"),
+            Value::ShortInt(i) => write!(f, "{i}"),
+            Value::LongInt(i) => write!(f, "{i}"),
+            Value::ShortReal(r) => write!(f, "{r}"),
+            Value::RawTwoState(vec) => {
+                write!(
+                    f,
+                    "{}",
+                    vec.iter()
+                        .map(|b| if *b { '1' } else { '0' })
+                        .collect::<String>()
+                )
+            }
+            Value::RawFourState(vec) => {
+                write!(
+                    f,
+                    "{}",
+                    vec.iter().map(|s| format!("{s}")).collect::<String>()
+                )
+            }
         }
     }
 }
@@ -135,6 +159,19 @@ pub struct StrengthValue {
 impl Display for StrengthValue {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{} ({}, {})", self.logic, self.strength0, self.strength1)
+    }
+}
+
+impl From<vpi_sys::t_vpi_strengthval> for StrengthValue {
+    fn from(strength: vpi_sys::t_vpi_strengthval) -> Self {
+        let logic = ScalarValue::from_u32(strength.logic as u32).unwrap_or(ScalarValue::DontCare);
+        let strength0 = StrengthEncoding::from_bits_truncate(strength.s0 as u32);
+        let strength1 = StrengthEncoding::from_bits_truncate(strength.s1 as u32);
+        Self {
+            logic,
+            strength0,
+            strength1,
+        }
     }
 }
 
@@ -292,6 +329,16 @@ impl Handle {
                     Value::Vector(vector_value_to_scalar_vector(vec, size))
                 }
             }
+            vpi_sys::vpiStrengthVal => {
+                let strength: vpi_sys::t_vpi_strengthval = unsafe { *value.value.strength };
+                Value::Strength(StrengthValue::from(strength))
+            }
+            vpi_sys::vpiTimeVal => {
+                let vpi_time: vpi_sys::t_vpi_time = unsafe { *value.value.time };
+                Value::Time(Time::from(vpi_time))
+            }
+            vpi_sys::vpiShortIntVal => Value::ShortInt(unsafe { value.value.integer } as i16),
+
             // For simplicity, other types are not fully implemented here
             _ => return None,
         };
@@ -441,7 +488,7 @@ impl Handle {
                 Some(
                     shortints
                         .into_iter()
-                        .map(|v| Value::Int(i32::from(v)))
+                        .map(Value::ShortInt)
                         .collect::<Vec<Value>>(),
                 )
             }
@@ -468,7 +515,7 @@ impl Handle {
                 Some(
                     longints
                         .into_iter()
-                        .map(|v| Value::Int(v as i32))
+                        .map(Value::LongInt)
                         .collect::<Vec<Value>>(),
                 )
             }
@@ -495,7 +542,7 @@ impl Handle {
                 Some(
                     shortreals
                         .into_iter()
-                        .map(|v| Value::Real(f64::from(v)))
+                        .map(Value::ShortReal)
                         .collect::<Vec<Value>>(),
                 )
             }
