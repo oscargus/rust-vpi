@@ -246,50 +246,101 @@ pub enum SysFuncType {
 
 #[repr(u32)]
 pub enum PrimType {
+    // Logic gates (1-8)
+    /// 1: and gate
     And = vpi_sys::vpiAndPrim,
+    /// 2: nand gate
     Nand = vpi_sys::vpiNandPrim,
-    Or = vpi_sys::vpiOrPrim,
+    /// 3: nor gate
     Nor = vpi_sys::vpiNorPrim,
+    /// 4: or gate
+    Or = vpi_sys::vpiOrPrim,
+    /// 5: xor gate
     Xor = vpi_sys::vpiXorPrim,
+    /// 6: xnor gate
     Xnor = vpi_sys::vpiXnorPrim,
-    Not = vpi_sys::vpiNotPrim,
+    /// 7: buffer
     Buf = vpi_sys::vpiBufPrim,
-    Seq = vpi_sys::vpiSeqPrim,
-    Comb = vpi_sys::vpiCombPrim,
+    /// 8: not gate
+    Not = vpi_sys::vpiNotPrim,
+
+    // Tri-state and controlled logic gates (9-12)
+    /// 9: zero-enabled buffer
     Bufif0 = vpi_sys::vpiBufif0Prim,
+    /// 10: one-enabled buffer
     Bufif1 = vpi_sys::vpiBufif1Prim,
+    /// 11: zero-enabled not gate
     Notif0 = vpi_sys::vpiNotif0Prim,
+    /// 12: one-enabled not gate
     Notif1 = vpi_sys::vpiNotif1Prim,
+
+    // MOS switches (13-15)
+    /// 13: nmos switch
     Nmos = vpi_sys::vpiNmosPrim,
+    /// 14: pmos switch
     Pmos = vpi_sys::vpiPmosPrim,
+    /// 15: cmos switch
     Cmos = vpi_sys::vpiCmosPrim,
+
+    // Resistive MOS switches (16-18)
+    /// 16: resistive nmos switch
     Rnmos = vpi_sys::vpiRnmosPrim,
+    /// 17: resistive pmos switch
     Rpmos = vpi_sys::vpiRpmosPrim,
+    /// 18: resistive cmos switch
     Rcmos = vpi_sys::vpiRcmosPrim,
+
+    // Bidirectional and resistive switches (19-24)
+    /// 19: resistive bidirectional
     Rtran = vpi_sys::vpiRtranPrim,
+    /// 20: zero-enable resistive bidirectional
     Rtranif0 = vpi_sys::vpiRtranif0Prim,
+    /// 21: one-enable resistive bidirectional
     Rtranif1 = vpi_sys::vpiRtranif1Prim,
+    /// 22: bidirectional
     Tran = vpi_sys::vpiTranPrim,
+    /// 23: zero-enabled bidirectional
     Tranif0 = vpi_sys::vpiTranif0Prim,
+    /// 24: one-enabled bidirectional
     Tranif1 = vpi_sys::vpiTranif1Prim,
+
+    // Pull-up/pull-down and UDP (25-28)
+    /// 25: pullup
     Pullup = vpi_sys::vpiPullupPrim,
+    /// 26: pulldown
     Pulldown = vpi_sys::vpiPulldownPrim,
+    /// 27: sequential UDP
+    Seq = vpi_sys::vpiSeqPrim,
+    /// 28: combinational UDP
+    Comb = vpi_sys::vpiCombPrim,
 }
 
 #[repr(u32)]
 pub enum TchkType {
+    /// 1: $setup timing check
     Setup = vpi_sys::vpiSetup,
+    /// 2: $hold timing check
     Hold = vpi_sys::vpiHold,
-    SetupHold = vpi_sys::vpiSetupHold,
-    Recovery = vpi_sys::vpiRecovery,
-    Removal = vpi_sys::vpiRemoval,
-    Recrem = vpi_sys::vpiRecrem,
-    Skew = vpi_sys::vpiSkew,
-    Timeskew = vpi_sys::vpiTimeskew,
-    Fullskew = vpi_sys::vpiFullskew,
+    /// 3: $period timing check
     Period = vpi_sys::vpiPeriod,
+    /// 4: $width timing check
     Width = vpi_sys::vpiWidth,
+    /// 5: $skew timing check
+    Skew = vpi_sys::vpiSkew,
+    /// 6: $recovery timing check
+    Recovery = vpi_sys::vpiRecovery,
+    /// 7: $nochange timing check
     NoChange = vpi_sys::vpiNoChange,
+    /// 8: $setuphold timing check (added with 1364-2001)
+    SetupHold = vpi_sys::vpiSetupHold,
+    /// 9: $fullskew timing check (added with 1364-2001)
+    Fullskew = vpi_sys::vpiFullskew,
+    /// 10: $recrem timing check (added with 1364-2001)
+    Recrem = vpi_sys::vpiRecrem,
+    /// 11: $removal timing check (added with 1364-2001)
+    Removal = vpi_sys::vpiRemoval,
+    /// 12: $timeskew timing check (added with 1364-2001)
+    Timeskew = vpi_sys::vpiTimeskew,
 }
 
 #[repr(u32)]
