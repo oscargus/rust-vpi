@@ -61,3 +61,32 @@ pub fn string_to_ascii_cstring(msg: impl AsRef<str>) -> CString {
         .collect();
     CString::new(iso8859_1_bytes).unwrap()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::string_to_ascii_cstring;
+
+    #[test]
+    fn ascii_is_preserved() {
+        let cstr = string_to_ascii_cstring("Hello, VPI!");
+        assert_eq!(cstr.to_bytes(), b"Hello, VPI!");
+    }
+
+    #[test]
+    fn non_ascii_chars_are_replaced_with_question_mark() {
+        let cstr = string_to_ascii_cstring("café Ω");
+        assert_eq!(cstr.to_bytes(), b"caf? ?");
+    }
+
+    #[test]
+    fn mixed_ascii_and_non_ascii_is_converted_correctly() {
+        let cstr = string_to_ascii_cstring("AéB中C");
+        assert_eq!(cstr.to_bytes(), b"A?B?C");
+    }
+
+    #[test]
+    #[should_panic]
+    fn interior_nul_panics() {
+        let _ = string_to_ascii_cstring("abc\0def");
+    }
+}
