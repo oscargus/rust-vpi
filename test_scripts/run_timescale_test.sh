@@ -12,7 +12,7 @@ echo ""
 
 # Compile Verilog testbench if not already compiled
 if [ ! -f testbench.vvp ]; then
-    iverilog -o testbench.vvp testbench.v
+    iverilog -o testbench.vvp test_examples/testbench.v
 fi
 
 # Find the shared library

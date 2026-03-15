@@ -600,3 +600,63 @@ impl Handle {
         self.get_bool(Property::Array) == Some(true)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        vector_value_to_scalar_vector, ScalarValue, StrengthEncoding, Value, ValueType,
+    };
+
+    fn scalar_vec_to_string(values: Vec<ScalarValue>) -> String {
+        values.into_iter().map(|value| value.to_string()).collect()
+    }
+
+    #[test]
+    fn vector_value_decodes_ab_encoding_and_reverses_bit_order() {
+        let vec = [vpi_sys::t_vpi_vecval { aval: 0b1010, bval: 0b1100 }];
+        let decoded = vector_value_to_scalar_vector(&vec, 4);
+
+        assert_eq!(scalar_vec_to_string(decoded), "XZ10");
+    }
+
+    #[test]
+    fn vector_value_uses_zero_when_words_are_missing() {
+        let decoded = vector_value_to_scalar_vector(&[], 3);
+
+        assert_eq!(scalar_vec_to_string(decoded), "000");
+    }
+
+    #[test]
+    fn raw_two_state_display_renders_binary_string() {
+        let value = Value::RawTwoState(vec![true, false, true, true, false]);
+
+        assert_eq!(value.to_string(), "10110");
+    }
+
+    #[test]
+    fn raw_four_state_display_renders_scalar_symbols() {
+        let value = Value::RawFourState(vec![
+            ScalarValue::Zero,
+            ScalarValue::One,
+            ScalarValue::X,
+            ScalarValue::Z,
+            ScalarValue::DontCare,
+            ScalarValue::NoChange,
+        ]);
+
+        assert_eq!(value.to_string(), "01XZ-N");
+    }
+
+    #[test]
+    fn strength_encoding_display_joins_active_flags_in_order() {
+        let strength = StrengthEncoding::StrongDrive | StrengthEncoding::HiZ;
+
+        assert_eq!(strength.to_string(), "StrongDrive | HiZ");
+    }
+
+    #[test]
+    fn value_type_display_has_human_readable_labels() {
+        assert_eq!(ValueType::RawFourState.to_string(), "Raw Four-State Vector");
+        assert_eq!(ValueType::ShortInt.to_string(), "Short Integer");
+    }
+}

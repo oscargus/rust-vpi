@@ -12,7 +12,7 @@ echo "Using Icarus Verilog (iverilog/vvp)"
 echo ""
 
 # Compile Verilog testbench
-iverilog -o testbench.vvp testbench.v
+iverilog -o testbench.vvp test_examples/testbench.v
 
 # Find the shared library
 VPI_LIB=$(find target/release -name "libsiminfo.so" -o -name "libsiminfo.dylib" 2>/dev/null | head -1)

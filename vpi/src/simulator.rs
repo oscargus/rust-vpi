@@ -167,3 +167,50 @@ pub fn get_top_module_timescales() -> Vec<(String, Option<Timescale>)> {
 
     results
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{power_of_10_to_time_str, Timescale};
+
+    #[test]
+    fn maps_known_power_values_to_expected_units() {
+        assert_eq!(power_of_10_to_time_str(2), "100s");
+        assert_eq!(power_of_10_to_time_str(1), "10s");
+        assert_eq!(power_of_10_to_time_str(0), "1s");
+        assert_eq!(power_of_10_to_time_str(-1), "100ms");
+        assert_eq!(power_of_10_to_time_str(-2), "10ms");
+        assert_eq!(power_of_10_to_time_str(-3), "1ms");
+        assert_eq!(power_of_10_to_time_str(-6), "1us");
+        assert_eq!(power_of_10_to_time_str(-9), "1ns");
+        assert_eq!(power_of_10_to_time_str(-12), "1ps");
+        assert_eq!(power_of_10_to_time_str(-15), "1fs");
+    }
+
+    #[test]
+    fn maps_unknown_power_values_to_fallback_format() {
+        assert_eq!(power_of_10_to_time_str(3), "10^3s");
+        assert_eq!(power_of_10_to_time_str(-4), "10^-4s");
+        assert_eq!(power_of_10_to_time_str(-10), "10^-10s");
+    }
+
+    #[test]
+    fn timescale_unit_and_precision_helpers_use_power_mapping() {
+        let timescale = Timescale {
+            unit: -9,
+            precision: -12,
+        };
+
+        assert_eq!(timescale.unit_str(), "1ns");
+        assert_eq!(timescale.precision_str(), "1ps");
+    }
+
+    #[test]
+    fn timescale_display_formats_as_unit_slash_precision() {
+        let timescale = Timescale {
+            unit: -6,
+            precision: -15,
+        };
+
+        assert_eq!(timescale.to_string(), "1us / 1fs");
+    }
+}
