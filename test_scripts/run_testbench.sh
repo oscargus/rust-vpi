@@ -4,7 +4,11 @@
 set -e
 
 echo "=== Building VPI Plugin ==="
-cargo build --release -p siminfo
+if [ "$(uname -s)" = "Darwin" ]; then
+    RUSTFLAGS="${RUSTFLAGS:+$RUSTFLAGS }-C link-arg=-Wl,-undefined,dynamic_lookup" cargo build --release -p siminfo
+else
+    cargo build --release -p siminfo
+fi
 
 echo ""
 echo "=== Running Verilog Testbench with VPI ==="

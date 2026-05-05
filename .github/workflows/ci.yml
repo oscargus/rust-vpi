@@ -8,34 +8,86 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        toolchain: ["stable", "nightly", "1.82"]
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    runs-on: ${{ matrix.os }}
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Cache Cargo dependencies
-        uses: Swatinem/rust-cache@v2
+      - name: Set up Rust
+        uses: actions-rust-lang/setup-rust-toolchain@1780873c7b576612439a134613cc4cc74ce5538c # v1.15.2
+        with:
+          toolchain:  ${{ matrix.toolchain }}
+      - name: Display versions
+        run: |
+          cargo -V
+          rustc -V
 
       - name: Run Rust tests
-        run: cargo test --workspace --all-targets
+        run: cargo test
 
       - name: Run Rust tests with all features
-        run: cargo test --workspace --all-targets --all-features
+        run: cargo test --all-features
 
-      - name: Install Icarus Verilog
+      - name: Install Icarus Verilog (Ubuntu)
+        if: runner.os == 'Linux'
+        continue-on-error: true
         run: |
           sudo apt-get update
           sudo apt-get install -y iverilog
 
-      - name: Run testbench script
+      - name: Install Icarus Verilog (macOS)
+        if: runner.os == 'macOS'
+        continue-on-error: true
+        run: brew install icarus-verilog
+
+      - name: Install Icarus Verilog (Windows)
+        if: runner.os == 'Windows'
+        continue-on-error: true
+        shell: pwsh
+        run: choco install iverilog -y
+
+      - name: Detect Icarus Verilog
+        id: iverilog
+        shell: pwsh
+        run: |
+          if ((Get-Command iverilog -ErrorAction SilentlyContinue) -and (Get-Command vvp -ErrorAction SilentlyContinue)) {
+            "available=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+            Write-Host "Icarus Verilog detected."
+          } else {
+            "available=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+            Write-Host "Icarus Verilog not available on this runner; VPI simulation scripts will be skipped."
+          }
+
+      - name: Run testbench script (Unix)
+        if: steps.iverilog.outputs.available == 'true' && runner.os != 'Windows'
         run: bash test_scripts/run_testbench.sh
 
-      - name: Run dumper script
+      - name: Run dumper script (Unix)
+        if: steps.iverilog.outputs.available == 'true' && runner.os != 'Windows'
         run: bash test_scripts/run_dumper.sh
 
-      - name: Run timescale script
+      - name: Run timescale script (Unix)
+        if: steps.iverilog.outputs.available == 'true' && runner.os != 'Windows'
         run: bash test_scripts/run_timescale_test.sh
+
+      - name: Run testbench script (Windows)
+        if: steps.iverilog.outputs.available == 'true' && runner.os == 'Windows'
+        shell: pwsh
+        run: ./test_scripts/run_testbench.ps1
+
+      - name: Run dumper script (Windows)
+        if: steps.iverilog.outputs.available == 'true' && runner.os == 'Windows'
+        shell: pwsh
+        run: ./test_scripts/run_dumper.ps1
+
+      - name: Run timescale script (Windows)
+        if: steps.iverilog.outputs.available == 'true' && runner.os == 'Windows'
+        shell: pwsh
+        run: ./test_scripts/run_timescale_test.ps1

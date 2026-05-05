@@ -4,7 +4,11 @@
 set -e
 
 echo "=== Building Dumper VPI Plugin ==="
-cargo build --release -p dumper
+if [ "$(uname -s)" = "Darwin" ]; then
+    RUSTFLAGS="${RUSTFLAGS:+$RUSTFLAGS }-C link-arg=-Wl,-undefined,dynamic_lookup" cargo build --release -p dumper
+else
+    cargo build --release -p dumper
+fi
 
 echo ""
 echo "=== Compiling Hierarchical Verilog Testbench ==="
