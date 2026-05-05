@@ -4,7 +4,11 @@
 set -e
 
 echo "=== Building Timescale VPI Plugin ==="
-cargo build --release -p timescale
+if [ "$(uname -s)" = "Darwin" ]; then
+    RUSTFLAGS="${RUSTFLAGS:+$RUSTFLAGS }-C link-arg=-Wl,-undefined,dynamic_lookup" cargo build --release -p timescale
+else
+    cargo build --release -p timescale
+fi
 
 echo ""
 echo "=== Running Verilog Testbench with Timescale VPI ==="
