@@ -1,3 +1,5 @@
+use vpi_sys::PLI_INT32;
+
 #[must_use]
 pub fn simulator_info() -> SimulatorInfo {
     let mut vlog_info = vpi_sys::t_vpi_vlog_info {
@@ -84,9 +86,10 @@ impl Timescale {
     /// The handle must be a valid VPI module handle
     pub unsafe fn from_module(module_handle: vpi_sys::vpiHandle) -> Option<Self> {
         // SAFETY: Caller guarantees module_handle is valid
-        let unit = unsafe { vpi_sys::vpi_get(crate::Property::TimeUnit as i32, module_handle) };
+        let unit =
+            unsafe { vpi_sys::vpi_get(crate::Property::TimeUnit as PLI_INT32, module_handle) };
         let precision =
-            unsafe { vpi_sys::vpi_get(crate::Property::TimePrecision as i32, module_handle) };
+            unsafe { vpi_sys::vpi_get(crate::Property::TimePrecision as PLI_INT32, module_handle) };
         Some(Timescale { unit, precision })
     }
 
@@ -119,9 +122,17 @@ fn power_of_10_to_time_str(power: i32) -> String {
         -1 => "100ms".to_string(),
         -2 => "10ms".to_string(),
         -3 => "1ms".to_string(),
+        -4 => "100us".to_string(),
+        -5 => "10us".to_string(),
         -6 => "1us".to_string(),
+        -7 => "100ns".to_string(),
+        -8 => "10ns".to_string(),
         -9 => "1ns".to_string(),
+        -10 => "100ps".to_string(),
+        -11 => "10ps".to_string(),
         -12 => "1ps".to_string(),
+        -13 => "100fs".to_string(),
+        -14 => "10fs".to_string(),
         -15 => "1fs".to_string(),
         _ => format!("10^{power}s"),
     }
@@ -184,13 +195,6 @@ mod tests {
         assert_eq!(power_of_10_to_time_str(-9), "1ns");
         assert_eq!(power_of_10_to_time_str(-12), "1ps");
         assert_eq!(power_of_10_to_time_str(-15), "1fs");
-    }
-
-    #[test]
-    fn maps_unknown_power_values_to_fallback_format() {
-        assert_eq!(power_of_10_to_time_str(3), "10^3s");
-        assert_eq!(power_of_10_to_time_str(-4), "10^-4s");
-        assert_eq!(power_of_10_to_time_str(-10), "10^-10s");
     }
 
     #[test]

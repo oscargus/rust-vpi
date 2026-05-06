@@ -269,7 +269,7 @@ where
     Handle::from_raw(handle)
 }
 
-pub fn remove_cb(handle: Handle) {
+pub fn remove_cb(handle: &Handle) {
     if !handle.is_null() {
         unsafe {
             vpi_sys::vpi_remove_cb(handle.as_raw());

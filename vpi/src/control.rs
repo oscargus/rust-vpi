@@ -1,3 +1,5 @@
+use vpi_sys::PLI_INT32;
+
 #[repr(u32)]
 pub enum Control {
     Stop = vpi_sys::vpiStop,
@@ -8,6 +10,6 @@ pub enum Control {
 
 pub fn control(control: Control) {
     unsafe {
-        vpi_sys::vpi_control(control as i32);
+        vpi_sys::vpi_control(control as PLI_INT32);
     }
 }

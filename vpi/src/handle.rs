@@ -1,5 +1,5 @@
 use crate::ObjectType;
-use vpi_sys::vpiHandle;
+use vpi_sys::{vpiHandle, PLI_INT32};
 
 pub struct Handle {
     handle: vpiHandle,
@@ -64,7 +64,7 @@ impl Handle {
 
     #[must_use]
     pub fn iterator(&self, typ: ObjectType) -> HandleIterator {
-        let raw = unsafe { vpi_sys::vpi_iterate(typ as i32, self.as_raw()) };
+        let raw = unsafe { vpi_sys::vpi_iterate(typ as PLI_INT32, self.as_raw()) };
         HandleIterator {
             iter: Handle::from_raw(raw),
         }
