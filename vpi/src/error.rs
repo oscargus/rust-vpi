@@ -1,34 +1,56 @@
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
 
+/// Error severity levels reported by VPI.
 #[repr(u32)]
 #[derive(FromPrimitive)]
 pub enum Severity {
+    /// Informational notice.
     Notice = vpi_sys::vpiNotice,
+    /// Warning that does not necessarily stop simulation.
     Warning = vpi_sys::vpiWarning,
+    /// Error condition.
     Error = vpi_sys::vpiError,
+    /// Simulator/system-level error.
     System = vpi_sys::vpiSystem,
+    /// Internal simulator error.
     Internal = vpi_sys::vpiInternal,
 }
 
+/// Simulation phase/state where an error occurred.
 #[repr(u32)]
 #[derive(FromPrimitive)]
 pub enum ErrorState {
+    /// Compile-time context.
     Compile = vpi_sys::vpiCompile,
+    /// PLI callback or API context.
     PLI = vpi_sys::vpiPLI,
+    /// Runtime simulation context.
     Run = vpi_sys::vpiRun,
 }
 
+/// Rich error information returned by `vpi_chk_error`.
 pub struct VPIError {
+    /// Simulator-defined error code.
     pub code: String,
+    /// Human-readable error message.
     pub message: String,
+    /// Source file path, when provided by the simulator.
     pub file: Option<String>,
+    /// Source line number, or `0` when unavailable.
     pub line: i32,
+    /// Optional mapped error severity.
     pub severity: Option<Severity>,
+    /// Optional mapped error state.
     pub state: Option<ErrorState>,
+    /// Simulator product name reporting the error.
     pub product: String,
 }
 
+/// Checks whether the simulator has a pending VPI error.
+///
+/// Returns `None` when no error is present, otherwise returns the translated
+/// [`VPIError`] payload.
 #[must_use]
 pub fn chk_error() -> Option<VPIError> {
     let mut error_info = vpi_sys::t_vpi_error_info {

@@ -2,10 +2,14 @@ use std::fmt::Display;
 
 use crate::Handle;
 
+/// Time value representation used by VPI APIs.
 #[derive(Debug)]
 pub enum Time {
+    /// Simulator time encoded as a 64-bit tick value.
     Sim(u64),
+    /// Real-valued scaled simulation time.
     ScaledReal(f64),
+    /// Indicates time should be suppressed for the operation.
     Suppress,
 }
 
@@ -58,6 +62,7 @@ impl From<Time> for vpi_sys::s_vpi_time {
 }
 
 impl Time {
+    /// Returns the raw VPI time kind constant for this variant.
     #[must_use]
     pub fn time_type(&self) -> i32 {
         match self {
@@ -69,6 +74,9 @@ impl Time {
 }
 
 impl Handle {
+    /// Returns the current simulation time for this handle.
+    ///
+    /// Returns `None` when called on a null handle.
     #[must_use]
     pub fn get_time(&self) -> Option<Time> {
         if self.is_null() {

@@ -6,25 +6,44 @@ use vpi_sys::{PLI_INT32, PLI_UINT32};
 
 use crate::{Handle, Property, Time};
 
+/// High-level value representation returned from or written to VPI objects.
 #[derive(Debug)]
 pub enum Value {
+    /// Binary string value.
     BinStr(String),
+    /// Octal string value.
     OctStr(String),
+    /// Hexadecimal string value.
     HexStr(String),
+    /// Decimal string value.
     DecStr(String),
+    /// 4-state scalar value.
     Scalar(ScalarValue),
+    /// 32-bit signed integer value.
     Int(i32),
+    /// 64-bit floating-point value.
     Real(f64),
+    /// Plain string value.
     String(String),
+    /// Vector of scalar bits.
     Vector(Vec<ScalarValue>),
+    /// Value with drive-strength information.
     Strength(StrengthValue),
+    /// Time value.
     Time(Time),
+    /// Raw object type value.
     ObjType(i32), // Placeholder, as object types are more complex
+    /// Suppress value transfer.
     Suppress,
+    /// 16-bit signed integer value.
     ShortInt(i16),
+    /// 64-bit signed integer value.
     LongInt(i64),
+    /// 32-bit floating-point value.
     ShortReal(f32),
+    /// Raw 2-state packed bits.
     RawTwoState(Vec<bool>),         // Each bit is either 0 or 1
+    /// Raw 4-state packed bits.
     RawFourState(Vec<ScalarValue>), // Each bit can be 0, 1, X, or Z
 }
 
@@ -74,6 +93,7 @@ impl Display for Value {
 
 #[repr(u32)]
 #[derive(FromPrimitive, ToPrimitive, Debug, Copy, Clone)]
+/// VPI value format tags used with `vpi_get_value` and related APIs.
 pub enum ValueType {
     BinStr = vpi_sys::vpiBinStrVal,
     OctStr = vpi_sys::vpiOctStrVal,
@@ -123,6 +143,7 @@ impl std::fmt::Display for ValueType {
 
 #[repr(u32)]
 #[derive(FromPrimitive, ToPrimitive, Copy, Clone, Debug)]
+/// 4-state scalar encodings used by VPI.
 pub enum ScalarValue {
     Zero = vpi_sys::vpi0,
     One = vpi_sys::vpi1,
@@ -151,6 +172,7 @@ impl Display for ScalarValue {
 }
 
 #[derive(Debug)]
+/// Scalar logic value plus drive strengths.
 pub struct StrengthValue {
     logic: ScalarValue,
     strength0: StrengthEncoding,
@@ -178,6 +200,7 @@ impl From<vpi_sys::t_vpi_strengthval> for StrengthValue {
 
 bitflags::bitflags! {
     #[derive(Debug)]
+    /// Drive-strength and charge encoding flags.
     pub struct StrengthEncoding: u32 {
         const SupplyDrive = vpi_sys::vpiSupplyDrive;
         const StrongDrive = vpi_sys::vpiStrongDrive;
@@ -222,6 +245,7 @@ impl Display for StrengthEncoding {
 }
 
 bitflags::bitflags! {
+    /// Flags controlling behavior of `vpi_put_value`.
     pub struct PutValueFlags: u32 {
         const ReturnEvent = vpi_sys::vpiReturnEvent;
         const UserAllocFlag = vpi_sys::vpiUserAllocFlag;
@@ -286,6 +310,9 @@ pub fn vector_value_to_scalar_vector(
 }
 
 impl Handle {
+    /// Reads a value from this handle in the requested format.
+    ///
+    /// Returns `None` for null handles or unsupported formats.
     #[must_use]
     pub fn get_value(&self, format: ValueType) -> Option<Value> {
         if self.is_null() {
@@ -367,6 +394,7 @@ impl Handle {
     ///     }
     /// }
     /// ```
+    #[must_use]
     pub fn get_value_array(&self, format: ValueType) -> Option<Vec<Value>> {
         if self.is_null() {
             return None;
@@ -594,6 +622,7 @@ impl Handle {
         }
     }
 
+    /// Returns whether this handle represents an array object.
     #[must_use]
     pub fn is_array(&self) -> bool {
         if self.is_null() {

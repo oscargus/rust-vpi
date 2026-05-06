@@ -1,5 +1,9 @@
 use vpi_sys::PLI_INT32;
 
+/// Returns simulator invocation metadata from `vpi_get_vlog_info`.
+///
+/// This includes the simulator product string, version string, and command-line
+/// arguments as reported by the active VPI implementation.
 #[must_use]
 pub fn simulator_info() -> SimulatorInfo {
     let mut vlog_info = vpi_sys::t_vpi_vlog_info {
@@ -33,13 +37,18 @@ pub fn simulator_info() -> SimulatorInfo {
     }
 }
 
+/// Simulator metadata reported by `vpi_get_vlog_info`.
 #[derive(Debug)]
 pub struct SimulatorInfo {
+    /// Command-line arguments used to start the simulator.
     pub arguments: Vec<String>,
+    /// Simulator version string.
     pub version: String,
+    /// Simulator product name.
     pub product: String,
 }
 
+/// Returns the simulator product name.
 #[must_use]
 pub fn simulator_name() -> String {
     let mut vlog_info = vpi_sys::t_vpi_vlog_info {
@@ -55,6 +64,7 @@ pub fn simulator_name() -> String {
         .to_string()
 }
 
+/// Returns the simulator version string.
 #[must_use]
 pub fn simulator_version() -> String {
     let mut vlog_info = vpi_sys::t_vpi_vlog_info {
@@ -138,9 +148,10 @@ fn power_of_10_to_time_str(power: i32) -> String {
     }
 }
 
-/// Get timescale for the top-level modules
+/// Returns timescale information for top-level modules.
 ///
-/// Returns a vector of (`module_name`, timescale) tuples for all top-level modules
+/// Each entry contains `(module_name, timescale)` where `timescale` is `None`
+/// when time unit/precision properties are not available.
 #[must_use]
 pub fn get_top_module_timescales() -> Vec<(String, Option<Timescale>)> {
     let mut results = Vec::new();

@@ -1,5 +1,8 @@
 use crate::{Handle, Time};
 
+/// VPI callback reasons used when registering simulator callbacks.
+///
+/// These values map directly to `vpi_sys::cb*` constants.
 #[repr(u32)]
 pub enum CbReason {
     ValueChange = vpi_sys::cbValueChange,
@@ -164,20 +167,35 @@ pub enum CbReason {
     EndOfObject = vpi_sys::cbEndOfObject,
 }
 
+/// Raw callback registration descriptor.
+///
+/// This mirrors the fields used by `vpi_register_cb` and is useful when
+/// constructing callback registrations manually.
 pub struct Callback {
+    /// Event reason that triggers the callback.
     pub reason: CbReason,
+    /// Native callback function pointer.
     pub cb_rtn: Option<unsafe extern "C" fn(*mut vpi_sys::t_cb_data) -> i32>,
+    /// Optional object associated with the callback.
     pub obj: Option<crate::Handle>,
+    /// Optional simulation time for time-based callbacks.
     pub time: Option<crate::Time>,
+    /// Optional value payload used by value-based callbacks.
     pub value: Option<crate::Value>,
+    /// Optional user data pointer passed back by the simulator.
     pub user_data: Option<*mut i8>,
 }
 
+/// Safe callback data passed to Rust closures.
 pub struct CbData {
+    /// Object handle associated with the callback invocation.
     pub obj: Handle,
 }
 
 impl Handle {
+    /// Registers a callback associated with this handle.
+    ///
+    /// Returns a callback handle that can be removed with [`remove_cb`].
     pub fn register_cb<F>(&self, reason: CbReason, callback: F) -> Handle
     where
         F: Fn(&CbData) + 'static,
@@ -225,6 +243,9 @@ where
     0 // Return 0 to indicate success
 }
 
+/// Registers a global callback not tied to a specific object handle.
+///
+/// Returns a callback handle that can be removed with [`remove_cb`].
 pub fn register_cb<F>(reason: CbReason, callback: F) -> Handle
 where
     F: Fn(&CbData) + 'static,
@@ -247,6 +268,10 @@ where
     Handle::from_raw(handle)
 }
 
+/// Registers a time-based callback.
+///
+/// The callback is scheduled according to `reason` and `time` as interpreted
+/// by the simulator.
 pub fn register_cb_with_time<F>(reason: CbReason, time: Time, callback: F) -> Handle
 where
     F: Fn(&CbData) + 'static,
@@ -269,6 +294,9 @@ where
     Handle::from_raw(handle)
 }
 
+/// Removes a previously registered callback.
+///
+/// If `handle` is null, this is a no-op.
 pub fn remove_cb(handle: &Handle) {
     if !handle.is_null() {
         unsafe {

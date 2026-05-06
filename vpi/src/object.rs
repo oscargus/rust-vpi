@@ -1,5 +1,8 @@
 use num_derive::{FromPrimitive, ToPrimitive};
 
+/// VPI object and relation kinds used with handle traversal APIs.
+///
+/// Values map directly to `vpi_sys::vpi*` constants.
 #[repr(u32)]
 #[derive(Copy, Clone, Debug, FromPrimitive, ToPrimitive)]
 pub enum ObjectType {

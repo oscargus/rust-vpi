@@ -1,13 +1,15 @@
 use std::ffi::CString;
 
+/// Multi-channel descriptor used by VPI for output streams.
 pub struct MCD {
     mask: u32,
 }
 
+/// Standard output MCD descriptor.
 pub static MCD_STDOUT: MCD = MCD { mask: 0x1 };
 
 impl MCD {
-    /// Create a new MCD with given filename.
+    /// Creates a new MCD for the given output file name.
     pub fn new(filename: impl AsRef<str>) -> Self {
         let c_filename = CString::new(filename.as_ref()).unwrap();
         let mask = unsafe { vpi_sys::vpi_mcd_open(c_filename.as_ptr().cast_mut()) };
@@ -27,14 +29,14 @@ impl MCD {
         self.write(format!("{}\n", msg.as_ref()));
     }
 
-    /// Close the MCD.
+    /// Closes this MCD stream in the simulator.
     pub fn close(&self) {
         unsafe {
             vpi_sys::vpi_mcd_close(self.mask);
         }
     }
 
-    /// Flush the MCD output.
+    /// Flushes any buffered MCD output.
     pub fn flush(&self) {
         unsafe {
             vpi_sys::vpi_mcd_flush(self.mask);
@@ -54,6 +56,7 @@ impl MCD {
     }
 }
 
+/// Combines two MCD descriptors into one destination mask.
 impl std::ops::BitOr for MCD {
     type Output = Self;
 
@@ -64,6 +67,7 @@ impl std::ops::BitOr for MCD {
     }
 }
 
+/// Formats and writes a line to an [`MCD`].
 #[macro_export]
 macro_rules! mcd_println {
     ($mcd:expr, $($arg:tt)*) => {{

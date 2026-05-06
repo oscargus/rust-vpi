@@ -1,3 +1,5 @@
+//! Safe and ergonomic wrappers for selected Verilog VPI APIs.
+
 #[macro_use]
 mod macros;
 
@@ -25,6 +27,9 @@ pub use simulator::*;
 pub use time::*;
 pub use value::*;
 
+/// Prints a message through the simulator's `vpi_printf`.
+///
+/// A trailing newline is appended automatically.
 pub fn printf(msg: impl AsRef<str>) {
     static FMT: &[u8] = b"%s\n\0";
     let cstr = string_to_ascii_cstring(msg);
@@ -36,6 +41,7 @@ pub fn printf(msg: impl AsRef<str>) {
     };
 }
 
+/// `format!`-style wrapper around [`printf`].
 #[macro_export]
 macro_rules! printf {
     ($($arg:tt)*) => {{
@@ -43,8 +49,9 @@ macro_rules! printf {
     }}
 }
 
-/// Convert Rust string to ASCII < 128 encoded C string
-/// Characters outside of ASCII range are replaced with ?
+/// Converts a Rust string into a 7-bit ASCII `CString`.
+///
+/// Characters outside the ASCII range are replaced with `?`.
 pub fn string_to_ascii_cstring(msg: impl AsRef<str>) -> CString {
     let sevenbit_ascii_bytes: Vec<u8> = msg
         .as_ref()

@@ -4,6 +4,9 @@ use vpi_sys::PLI_INT32;
 
 use crate::{Handle, ObjectType};
 
+/// VPI property identifiers used with `vpi_get` and `vpi_get_str`.
+///
+/// Values map directly to `vpi_sys::vpi*` property constants.
 #[repr(i32)]
 pub enum Property {
     /// -1: undefined property
@@ -306,10 +309,12 @@ pub enum Property {
 }
 
 impl Property {
+    /// Alias retained for compatibility with legacy naming.
     #[allow(non_upper_case_globals)]
     pub const SysFuncType: Self = Property::FuncType;
 }
 
+/// Port direction classification.
 #[repr(u32)]
 #[derive(FromPrimitive, ToPrimitive)]
 pub enum Direction {
@@ -320,6 +325,7 @@ pub enum Direction {
     NoDirection = vpi_sys::vpiNoDirection,
 }
 
+/// Net type classification for net objects.
 #[repr(u32)]
 #[derive(FromPrimitive, ToPrimitive)]
 pub enum NetType {
@@ -339,6 +345,7 @@ pub enum NetType {
 }
 
 bitflags::bitflags! {
+    /// Edge sensitivity mask values.
     pub struct Edge: u32 {
         const NoEdge = vpi_sys::vpiNoEdge;
         const Edge01 = vpi_sys::vpiEdge01;
@@ -353,6 +360,7 @@ bitflags::bitflags! {
     }
 }
 
+/// Literal/constant encoding type.
 #[repr(u32)]
 #[derive(FromPrimitive, ToPrimitive)]
 pub enum ConstType {
@@ -376,6 +384,7 @@ pub enum ConstType {
     Null = vpi_sys::vpiNullConst,
 }
 
+/// Function return type classification.
 #[repr(u32)]
 #[derive(FromPrimitive, ToPrimitive)]
 pub enum FuncType {
@@ -388,6 +397,7 @@ pub enum FuncType {
     Other = vpi_sys::vpiOtherFunc,
 }
 
+/// System function return type classification.
 #[repr(u32)]
 #[derive(FromPrimitive, ToPrimitive)]
 pub enum SysFuncType {
@@ -397,6 +407,7 @@ pub enum SysFuncType {
     Sized = vpi_sys::vpiSysFuncSized,
 }
 
+/// Primitive instance subtype.
 #[repr(u32)]
 #[derive(FromPrimitive, ToPrimitive)]
 pub enum PrimType {
@@ -469,6 +480,7 @@ pub enum PrimType {
     Comb = vpi_sys::vpiCombPrim,
 }
 
+/// Timing check subtype.
 #[repr(u32)]
 #[derive(FromPrimitive, ToPrimitive)]
 pub enum TchkType {
@@ -498,6 +510,7 @@ pub enum TchkType {
     Timeskew = vpi_sys::vpiTimeskew,
 }
 
+/// Operation subtype for expression objects.
 #[repr(u32)]
 #[derive(FromPrimitive, ToPrimitive)]
 pub enum OpType {
@@ -747,11 +760,15 @@ pub enum OpType {
 }
 
 impl OpType {
+    /// Alias retained for compatibility with legacy naming.
     #[allow(non_upper_case_globals)]
     pub const BitXNor: Self = OpType::BitXnor;
 }
 
 impl Handle {
+    /// Reads a numeric property and returns it as `u32` when supported.
+    ///
+    /// Returns `None` for null handles or unsupported properties.
     #[must_use]
     pub fn get_u32(&self, property: Property) -> Option<u32> {
         if self.is_null() {
@@ -771,6 +788,10 @@ impl Handle {
             _ => None, // For simplicity, only handle common properties here
         }
     }
+
+    /// Reads a string property when supported.
+    ///
+    /// Returns `None` for null handles, unsupported properties, or invalid UTF-8.
     #[must_use]
     pub fn get_str(&self, property: Property) -> Option<String> {
         if self.is_null() {
@@ -799,6 +820,9 @@ impl Handle {
         }
     }
 
+    /// Reads a boolean property when supported.
+    ///
+    /// Returns `None` for null handles or unsupported properties.
     #[must_use]
     pub fn get_bool(&self, property: Property) -> Option<bool> {
         if self.is_null() {
@@ -832,6 +856,7 @@ impl Handle {
         }
     }
 
+    /// Returns this object's port direction, if available.
     #[must_use]
     pub fn get_direction(&self) -> Option<Direction> {
         if self.is_null() {
@@ -841,6 +866,7 @@ impl Handle {
         Direction::from_u32(value as u32)
     }
 
+    /// Returns this object's operation subtype, if available.
     #[must_use]
     pub fn get_op_type(&self) -> Option<OpType> {
         if self.is_null() {
@@ -850,6 +876,7 @@ impl Handle {
         OpType::from_u32(value as u32)
     }
 
+    /// Returns this object's primitive subtype, if available.
     #[must_use]
     pub fn get_prim_type(&self) -> Option<PrimType> {
         if self.is_null() {
@@ -859,6 +886,7 @@ impl Handle {
         PrimType::from_u32(value as u32)
     }
 
+    /// Returns this object's timing check subtype, if available.
     #[must_use]
     pub fn get_tchk_type(&self) -> Option<TchkType> {
         if self.is_null() {
@@ -868,6 +896,7 @@ impl Handle {
         TchkType::from_u32(value as u32)
     }
 
+    /// Returns this object's constant subtype, if available.
     #[must_use]
     pub fn get_const_type(&self) -> Option<ConstType> {
         if self.is_null() {
@@ -877,6 +906,7 @@ impl Handle {
         ConstType::from_u32(value as u32)
     }
 
+    /// Returns this object's function type, if available.
     #[must_use]
     pub fn get_func_type(&self) -> Option<FuncType> {
         if self.is_null() {
@@ -886,6 +916,7 @@ impl Handle {
         FuncType::from_u32(value as u32)
     }
 
+    /// Returns this object's system function type, if available.
     #[must_use]
     pub fn get_sys_func_type(&self) -> Option<SysFuncType> {
         if self.is_null() {
@@ -895,6 +926,7 @@ impl Handle {
         SysFuncType::from_u32(value as u32)
     }
 
+    /// Returns this object's edge mask, if available.
     #[must_use]
     pub fn get_edge(&self) -> Option<Edge> {
         if self.is_null() {
@@ -904,6 +936,7 @@ impl Handle {
         Edge::from_bits(value as u32)
     }
 
+    /// Returns this object's VPI object type.
     #[must_use]
     pub fn get_type(&self) -> Option<ObjectType> {
         if self.is_null() {
