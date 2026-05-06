@@ -1,0 +1,81 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set up Rust
+        uses: actions-rust-lang/setup-rust-toolchain@1780873c7b576612439a134613cc4cc74ce5538c # v1.15.2
+        with:
+          toolchain: stable
+
+      - name: Validate semver tag and workspace version
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          TAG="${GITHUB_REF_NAME}"
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([-.+][0-9A-Za-z.-]+)?$ ]]; then
+            echo "Tag '$TAG' is not a supported semver tag (expected vX.Y.Z[pre-release])."
+            exit 1
+          fi
+
+          TAG_VERSION="${TAG#v}"
+          WORKSPACE_VERSION="$(awk '
+            $0=="[workspace.package]" { in_section=1; next }
+            in_section && /^\[/ { in_section=0 }
+            in_section && $1=="version" { gsub(/"/, "", $3); print $3; exit }
+          ' Cargo.toml)"
+
+          if [[ -z "$WORKSPACE_VERSION" ]]; then
+            echo "Could not read [workspace.package].version from Cargo.toml"
+            exit 1
+          fi
+
+          if [[ "$TAG_VERSION" != "$WORKSPACE_VERSION" ]]; then
+            echo "Tag version '$TAG_VERSION' does not match workspace version '$WORKSPACE_VERSION'."
+            exit 1
+          fi
+
+      - name: Package check (dry run)
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: |
+          cargo publish -p vpi-sys --locked --dry-run
+          cargo publish -p vpi --locked --dry-run
+
+      - name: Publish vpi-sys
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: cargo publish -p vpi-sys --locked
+
+      - name: Publish vpi (retry for index propagation)
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in {1..12}; do
+            if cargo publish -p vpi --locked; then
+              exit 0
+            fi
+
+            if [[ "$attempt" -eq 12 ]]; then
+              echo "Failed to publish vpi after $attempt attempts."
+              exit 1
+            fi
+
+            echo "vpi publish failed on attempt $attempt; waiting for crates.io index propagation..."
+            sleep 20
+          done

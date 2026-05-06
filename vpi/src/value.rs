@@ -42,7 +42,7 @@ pub enum Value {
     /// 32-bit floating-point value.
     ShortReal(f32),
     /// Raw 2-state packed bits.
-    RawTwoState(Vec<bool>),         // Each bit is either 0 or 1
+    RawTwoState(Vec<bool>), // Each bit is either 0 or 1
     /// Raw 4-state packed bits.
     RawFourState(Vec<ScalarValue>), // Each bit can be 0, 1, X, or Z
 }

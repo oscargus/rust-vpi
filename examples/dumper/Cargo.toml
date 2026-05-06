@@ -2,6 +2,9 @@
 name = "dumper"
 version.workspace = true
 edition.workspace = true
+authors.workspace = true
+repository.workspace = true
+publish = false
 
 [lib]
 crate-type = ["cdylib"]
