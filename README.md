@@ -7,4 +7,4 @@ vpi is a Rust crate for easily working with the Verilog Procedural Interface (VP
 
 vpi-sys is a simple bindgen-wrapper that automatically generates Rust-bindings.
 
-Both are licensed under the MIT license.
+Both crates are licensed under the MIT license. However, I do not claim any license for the .h-file in vpi-sys, which are based on the IEEE 1800 standard.
