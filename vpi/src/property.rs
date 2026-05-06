@@ -1,5 +1,6 @@
 use num_derive::{FromPrimitive, ToPrimitive};
 use num_traits::FromPrimitive;
+use vpi_sys::PLI_INT32;
 
 use crate::{Handle, ObjectType};
 
@@ -764,7 +765,7 @@ impl Handle {
             | Property::DefNetType
             | Property::PortIndex
             | Property::TermIndex => unsafe {
-                let value = vpi_sys::vpi_get(property as i32, self.as_raw());
+                let value = vpi_sys::vpi_get(property as PLI_INT32, self.as_raw());
                 Some(value as u32)
             },
             _ => None, // For simplicity, only handle common properties here
@@ -782,7 +783,7 @@ impl Handle {
             | Property::File
             | Property::DefFile
             | Property::Type => unsafe {
-                let ptr = vpi_sys::vpi_get_str(property as i32, self.as_raw());
+                let ptr = vpi_sys::vpi_get_str(property as PLI_INT32, self.as_raw());
                 if ptr.is_null() {
                     None
                 } else {
@@ -824,7 +825,7 @@ impl Handle {
             | Property::ModPathHasIfNone
             | Property::IsMemory
             | Property::IsProtected => unsafe {
-                let value = vpi_sys::vpi_get(property as i32, self.as_raw());
+                let value = vpi_sys::vpi_get(property as PLI_INT32, self.as_raw());
                 Some(value != 0)
             },
             _ => None, // For simplicity, only handle common properties here
@@ -836,7 +837,7 @@ impl Handle {
         if self.is_null() {
             return None;
         }
-        let value = unsafe { vpi_sys::vpi_get(Property::Direction as i32, self.as_raw()) };
+        let value = unsafe { vpi_sys::vpi_get(Property::Direction as PLI_INT32, self.as_raw()) };
         Direction::from_u32(value as u32)
     }
 
@@ -845,7 +846,7 @@ impl Handle {
         if self.is_null() {
             return None;
         }
-        let value = unsafe { vpi_sys::vpi_get(Property::OpType as i32, self.as_raw()) };
+        let value = unsafe { vpi_sys::vpi_get(Property::OpType as PLI_INT32, self.as_raw()) };
         OpType::from_u32(value as u32)
     }
 
@@ -854,7 +855,7 @@ impl Handle {
         if self.is_null() {
             return None;
         }
-        let value = unsafe { vpi_sys::vpi_get(Property::PrimType as i32, self.as_raw()) };
+        let value = unsafe { vpi_sys::vpi_get(Property::PrimType as PLI_INT32, self.as_raw()) };
         PrimType::from_u32(value as u32)
     }
 
@@ -863,7 +864,7 @@ impl Handle {
         if self.is_null() {
             return None;
         }
-        let value = unsafe { vpi_sys::vpi_get(Property::TchkType as i32, self.as_raw()) };
+        let value = unsafe { vpi_sys::vpi_get(Property::TchkType as PLI_INT32, self.as_raw()) };
         TchkType::from_u32(value as u32)
     }
 
@@ -872,7 +873,7 @@ impl Handle {
         if self.is_null() {
             return None;
         }
-        let value = unsafe { vpi_sys::vpi_get(Property::ConstType as i32, self.as_raw()) };
+        let value = unsafe { vpi_sys::vpi_get(Property::ConstType as PLI_INT32, self.as_raw()) };
         ConstType::from_u32(value as u32)
     }
 
@@ -881,7 +882,7 @@ impl Handle {
         if self.is_null() {
             return None;
         }
-        let value = unsafe { vpi_sys::vpi_get(Property::FuncType as i32, self.as_raw()) };
+        let value = unsafe { vpi_sys::vpi_get(Property::FuncType as PLI_INT32, self.as_raw()) };
         FuncType::from_u32(value as u32)
     }
 
@@ -890,7 +891,7 @@ impl Handle {
         if self.is_null() {
             return None;
         }
-        let value = unsafe { vpi_sys::vpi_get(Property::SysFuncType as i32, self.as_raw()) };
+        let value = unsafe { vpi_sys::vpi_get(Property::SysFuncType as PLI_INT32, self.as_raw()) };
         SysFuncType::from_u32(value as u32)
     }
 
@@ -899,7 +900,7 @@ impl Handle {
         if self.is_null() {
             return None;
         }
-        let value = unsafe { vpi_sys::vpi_get(Property::Edge as i32, self.as_raw()) };
+        let value = unsafe { vpi_sys::vpi_get(Property::Edge as PLI_INT32, self.as_raw()) };
         Edge::from_bits(value as u32)
     }
 
@@ -908,7 +909,7 @@ impl Handle {
         if self.is_null() {
             return None;
         }
-        let value = unsafe { vpi_sys::vpi_get(Property::Type as i32, self.as_raw()) };
+        let value = unsafe { vpi_sys::vpi_get(Property::Type as PLI_INT32, self.as_raw()) };
         ObjectType::from_u32(value as u32)
     }
 }

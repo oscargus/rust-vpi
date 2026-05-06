@@ -2,6 +2,7 @@ use std::fmt::Display;
 
 use num_derive::{FromPrimitive, ToPrimitive};
 use num_traits::FromPrimitive;
+use vpi_sys::{PLI_INT32, PLI_UINT32};
 
 use crate::{Handle, Property, Time};
 
@@ -18,7 +19,7 @@ pub enum Value {
     Vector(Vec<ScalarValue>),
     Strength(StrengthValue),
     Time(Time),
-    ObjType(u32), // Placeholder, as object types are more complex
+    ObjType(i32), // Placeholder, as object types are more complex
     Suppress,
     ShortInt(i16),
     LongInt(i64),
@@ -72,7 +73,7 @@ impl Display for Value {
 }
 
 #[repr(u32)]
-#[derive(FromPrimitive, ToPrimitive, Debug)]
+#[derive(FromPrimitive, ToPrimitive, Debug, Copy, Clone)]
 pub enum ValueType {
     BinStr = vpi_sys::vpiBinStrVal,
     OctStr = vpi_sys::vpiOctStrVal,
@@ -313,7 +314,7 @@ impl Handle {
                 let c_str = unsafe { std::ffi::CStr::from_ptr(value.value.str_) };
                 Value::String(c_str.to_str().unwrap_or("").to_string())
             }
-            vpi_sys::vpiObjTypeVal => Value::ObjType(unsafe { value.value.integer } as u32),
+            vpi_sys::vpiObjTypeVal => Value::ObjType(unsafe { value.value.integer }),
             vpi_sys::vpiVectorVal => {
                 let vec_ptr = unsafe { value.value.vector };
                 if vec_ptr.is_null() {
@@ -371,7 +372,8 @@ impl Handle {
             return None;
         }
 
-        let size = unsafe { vpi_sys::vpi_get(vpi_sys::vpiSize as i32, self.as_raw()) } as usize;
+        let size =
+            unsafe { vpi_sys::vpi_get(vpi_sys::vpiSize as PLI_INT32, self.as_raw()) } as usize;
 
         if size == 0 {
             return Some(Vec::new());
@@ -394,7 +396,7 @@ impl Handle {
                         self.as_raw(),
                         &raw mut arrayvalue,
                         &raw mut index,
-                        size as u32,
+                        size as PLI_UINT32,
                     );
                 }
 
@@ -416,7 +418,7 @@ impl Handle {
                         self.as_raw(),
                         &raw mut arrayvalue,
                         &raw mut index,
-                        size as u32,
+                        size as PLI_UINT32,
                     );
                 }
 
@@ -446,7 +448,7 @@ impl Handle {
                         self.as_raw(),
                         &raw mut arrayvalue,
                         &raw mut index,
-                        size as u32,
+                        size as PLI_UINT32,
                     );
                 }
 
@@ -481,7 +483,7 @@ impl Handle {
                         self.as_raw(),
                         &raw mut arrayvalue,
                         &raw mut index,
-                        size as u32,
+                        size as PLI_UINT32,
                     );
                 }
 
@@ -508,7 +510,7 @@ impl Handle {
                         self.as_raw(),
                         &raw mut arrayvalue,
                         &raw mut index,
-                        size as u32,
+                        size as PLI_UINT32,
                     );
                 }
 
@@ -535,7 +537,7 @@ impl Handle {
                         self.as_raw(),
                         &raw mut arrayvalue,
                         &raw mut index,
-                        size as u32,
+                        size as PLI_UINT32,
                     );
                 }
 
@@ -574,7 +576,7 @@ impl Handle {
                         self.as_raw(),
                         &raw mut arrayvalue,
                         &raw mut index,
-                        size as u32,
+                        size as PLI_UINT32,
                     );
                 }
 
@@ -603,9 +605,7 @@ impl Handle {
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        vector_value_to_scalar_vector, ScalarValue, StrengthEncoding, Value, ValueType,
-    };
+    use super::{vector_value_to_scalar_vector, ScalarValue, StrengthEncoding, Value, ValueType};
 
     fn scalar_vec_to_string(values: Vec<ScalarValue>) -> String {
         values.into_iter().map(|value| value.to_string()).collect()
@@ -613,7 +613,10 @@ mod tests {
 
     #[test]
     fn vector_value_decodes_ab_encoding_and_reverses_bit_order() {
-        let vec = [vpi_sys::t_vpi_vecval { aval: 0b1010, bval: 0b1100 }];
+        let vec = [vpi_sys::t_vpi_vecval {
+            aval: 0b1010,
+            bval: 0b1100,
+        }];
         let decoded = vector_value_to_scalar_vector(&vec, 4);
 
         assert_eq!(scalar_vec_to_string(decoded), "XZ10");

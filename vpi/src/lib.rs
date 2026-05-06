@@ -46,20 +46,23 @@ macro_rules! printf {
 /// Convert Rust string to ASCII < 128 encoded C string
 /// Characters outside of ASCII range are replaced with ?
 pub fn string_to_ascii_cstring(msg: impl AsRef<str>) -> CString {
-    // Convert UTF-8 string to ISO-8859-1 bytes
-    let iso8859_1_bytes: Vec<u8> = msg
+    let sevenbit_ascii_bytes: Vec<u8> = msg
         .as_ref()
         .chars()
         .map(|c| {
             let code = c as u32;
-            if code <= 0x7F {
-                code as u8
+            if let Ok(code) = u8::try_from(code) {
+                if code < 128 {
+                    code // 7-bit ASCII character
+                } else {
+                    b'?' // Replace characters outside 7-bit ASCII with '?'
+                }
             } else {
-                b'?' // Replace characters outside ASCII range
+                b'?' // Replace characters outside 7-bit ASCII with '?'
             }
         })
         .collect();
-    CString::new(iso8859_1_bytes).unwrap()
+    CString::new(sevenbit_ascii_bytes).unwrap()
 }
 
 #[cfg(test)]

@@ -38,7 +38,7 @@ impl From<Time> for vpi_sys::s_vpi_time {
             Time::Sim(sim_time) => vpi_sys::s_vpi_time {
                 type_: vpi_sys::vpiSimTime as i32,
                 high: (sim_time >> 32) as u32,
-                low: (sim_time & 0xFFFFFFFF) as u32,
+                low: (sim_time & 0xFFFF_FFFF) as u32,
                 real: 0.0,
             },
             Time::ScaledReal(scaled_real) => vpi_sys::s_vpi_time {
