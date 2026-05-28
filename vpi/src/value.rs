@@ -32,7 +32,13 @@ pub enum Value {
     /// Time value.
     Time(Time),
     /// Raw object type value.
-    ObjType(i32), // Placeholder, as object types are more complex
+    ///
+    /// This variant is used when the simulator returns `vpiObjTypeVal`
+    /// directly. When [`ValueType::ObjType`] is requested via
+    /// [`Handle::get_value`], the simulator may instead report a more specific
+    /// value format, in which case `get_value` returns the corresponding
+    /// concrete [`Value`] variant.
+    ObjType(i32),
     /// Suppress value transfer.
     Suppress,
     /// 16-bit signed integer value.
@@ -95,23 +101,46 @@ impl Display for Value {
 #[derive(FromPrimitive, ToPrimitive, Debug, Copy, Clone)]
 /// VPI value format tags used with `vpi_get_value` and related APIs.
 pub enum ValueType {
+    /// Binary string format.
     BinStr = vpi_sys::vpiBinStrVal,
+    /// Octal string format.
     OctStr = vpi_sys::vpiOctStrVal,
+    /// Hexadecimal string format.
     HexStr = vpi_sys::vpiHexStrVal,
+    /// Decimal string format.
     DecStr = vpi_sys::vpiDecStrVal,
+    /// 4-state scalar format.
     Scalar = vpi_sys::vpiScalarVal,
+    /// 32-bit signed integer format.
     Int = vpi_sys::vpiIntVal,
+    /// 64-bit floating-point format.
     Real = vpi_sys::vpiRealVal,
+    /// String format.
     String = vpi_sys::vpiStringVal,
+    /// Vector-of-bits format.
     Vector = vpi_sys::vpiVectorVal,
+    /// Scalar-plus-strength format.
     Strength = vpi_sys::vpiStrengthVal,
+    /// Time format.
     Time = vpi_sys::vpiTimeVal,
+    /// Request that the simulator choose the object's native value format.
+    ///
+    /// When used with [`Handle::get_value`], the simulator can replace this
+    /// request with the actual value format for the object, so the returned
+    /// [`Value`] is typically the corresponding concrete variant rather than
+    /// [`Value::ObjType`].
     ObjType = vpi_sys::vpiObjTypeVal,
+    /// Suppress value transfer.
     Suppress = vpi_sys::vpiSuppressVal,
+    /// 16-bit signed integer format.
     ShortInt = vpi_sys::vpiShortIntVal,
+    /// 64-bit signed integer format.
     LongInt = vpi_sys::vpiLongIntVal,
+    /// 32-bit floating-point format.
     ShortReal = vpi_sys::vpiShortRealVal,
+    /// Raw packed 2-state vector format.
     RawTwoState = vpi_sys::vpiRawTwoStateVal,
+    /// Raw packed 4-state vector format.
     RawFourState = vpi_sys::vpiRawFourStateVal,
 }
 
@@ -145,13 +174,21 @@ impl std::fmt::Display for ValueType {
 #[derive(FromPrimitive, ToPrimitive, Copy, Clone, Debug)]
 /// 4-state scalar encodings used by VPI.
 pub enum ScalarValue {
+    /// Logic `0`.
     Zero = vpi_sys::vpi0,
+    /// Logic `1`.
     One = vpi_sys::vpi1,
+    /// Unknown logic state.
     X = vpi_sys::vpiX,
+    /// High-impedance state.
     Z = vpi_sys::vpiZ,
+    /// Weak high state.
     H = vpi_sys::vpiH,
+    /// Weak low state.
     L = vpi_sys::vpiL,
+    /// Don't-care state.
     DontCare = vpi_sys::vpiDontCare,
+    /// Leave the current value unchanged.
     NoChange = vpi_sys::vpiNoChange,
 }
 
@@ -174,8 +211,11 @@ impl Display for ScalarValue {
 #[derive(Debug)]
 /// Scalar logic value plus drive strengths.
 pub struct StrengthValue {
+    /// Scalar logic state carried by the value.
     logic: ScalarValue,
+    /// Drive strength applied when the logic resolves to `0`.
     strength0: StrengthEncoding,
+    /// Drive strength applied when the logic resolves to `1`.
     strength1: StrengthEncoding,
 }
 
@@ -202,13 +242,21 @@ bitflags::bitflags! {
     #[derive(Debug)]
     /// Drive-strength and charge encoding flags.
     pub struct StrengthEncoding: u32 {
+        /// Supply-strength drive.
         const SupplyDrive = vpi_sys::vpiSupplyDrive;
+        /// Strong drive strength.
         const StrongDrive = vpi_sys::vpiStrongDrive;
+        /// Pull drive strength.
         const PullDrive = vpi_sys::vpiPullDrive;
+        /// Large charge strength.
         const LargeCharge = vpi_sys::vpiLargeCharge;
+        /// Weak drive strength.
         const WeakDrive = vpi_sys::vpiWeakDrive;
+        /// Medium charge strength.
         const MediumCharge = vpi_sys::vpiMediumCharge;
+        /// Small charge strength.
         const SmallCharge = vpi_sys::vpiSmallCharge;
+        /// High-impedance strength.
         const HiZ = vpi_sys::vpiHiZ;
     }
 }
@@ -247,9 +295,13 @@ impl Display for StrengthEncoding {
 bitflags::bitflags! {
     /// Flags controlling behavior of `vpi_put_value`.
     pub struct PutValueFlags: u32 {
+        /// Return an event handle for the scheduled value update.
         const ReturnEvent = vpi_sys::vpiReturnEvent;
+        /// Indicates that associated storage is managed by user code.
         const UserAllocFlag = vpi_sys::vpiUserAllocFlag;
+        /// Restrict the update to a single value.
         const OneValue = vpi_sys::vpiOneValue;
+        /// Disable propagation for the value update.
         const PropagateOff = vpi_sys::vpiPropagateOff;
     }
 }
@@ -311,6 +363,11 @@ pub fn vector_value_to_scalar_vector(
 
 impl Handle {
     /// Reads a value from this handle in the requested format.
+    ///
+    /// If `format` is [`ValueType::ObjType`], the simulator may override the
+    /// requested format with the object's native value format. In that case,
+    /// this method returns the matching concrete [`Value`] variant rather than
+    /// always returning [`Value::ObjType`].
     ///
     /// Returns `None` for null handles or unsupported formats.
     #[must_use]

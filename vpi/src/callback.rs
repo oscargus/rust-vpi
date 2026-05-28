@@ -5,165 +5,196 @@ use crate::{Handle, Time};
 /// These values map directly to `vpi_sys::cb*` constants.
 #[repr(u32)]
 pub enum CbReason {
+    /// Callback on value change.
     ValueChange = vpi_sys::cbValueChange,
+    /// Callback on statement execution.
     Stmt = vpi_sys::cbStmt,
+    /// Callback on force.
     Force = vpi_sys::cbForce,
+    /// Callback on release.
     Release = vpi_sys::cbRelease,
+    /// Callback at the start of the current simulation time.
     AtStartOfSimTime = vpi_sys::cbAtStartOfSimTime,
+    /// Callback during the read-write synchronization phase.
     ReadWriteSynch = vpi_sys::cbReadWriteSynch,
+    /// Callback during the read-only synchronization phase.
     ReadOnlySynch = vpi_sys::cbReadOnlySynch,
+    /// Callback at the next simulation time.
     NextSimTime = vpi_sys::cbNextSimTime,
+    /// Callback after a delay.
     AfterDelay = vpi_sys::cbAfterDelay,
+    /// Callback at the end of compilation.
     EndOfCompile = vpi_sys::cbEndOfCompile,
+    /// Callback at the start of simulation.
     StartOfSimulation = vpi_sys::cbStartOfSimulation,
+    /// Callback at the end of simulation.
     EndOfSimulation = vpi_sys::cbEndOfSimulation,
+    /// Callback on error.
     Error = vpi_sys::cbError,
+    /// Callback on timing-check violation.
     TchkViolation = vpi_sys::cbTchkViolation,
+    /// Callback at the start of save.
     StartOfSave = vpi_sys::cbStartOfSave,
+    /// Callback at the end of save.
     EndOfSave = vpi_sys::cbEndOfSave,
+    /// Callback at the start of restart.
     StartOfRestart = vpi_sys::cbStartOfRestart,
+    /// Callback at the end of restart.
     EndOfRestart = vpi_sys::cbEndOfRestart,
+    /// Callback at the start of reset.
     StartOfReset = vpi_sys::cbStartOfReset,
+    /// Callback at the end of reset.
     EndOfReset = vpi_sys::cbEndOfReset,
+    /// Callback on entry to interactive mode.
     EnterInteractive = vpi_sys::cbEnterInteractive,
+    /// Callback on exit from interactive mode.
     ExitInteractive = vpi_sys::cbExitInteractive,
+    /// Callback when the interactive scope changes.
     InteractiveScopeChange = vpi_sys::cbInteractiveScopeChange,
+    /// Callback on unresolved system task or function lookup.
     UnresolvedSystf = vpi_sys::cbUnresolvedSystf,
+    /// Callback on PLI error.
     PLIError = vpi_sys::cbPLIError,
+    /// Callback on assignment.
     Assign = vpi_sys::cbAssign,
+    /// Callback on deassignment.
     Deassign = vpi_sys::cbDeassign,
+    /// Callback on disable.
     Disable = vpi_sys::cbDisable,
+    /// Callback on signal delivery.
     Signal = vpi_sys::cbSignal,
+    /// Callback during the NBA synchronization phase.
     NBASynch = vpi_sys::cbNBASynch,
+    /// Callback at the end of the current simulation time.
     AtEndOfSimTime = vpi_sys::cbAtEndOfSimTime,
 
     #[cfg(feature = "sv")]
     // SystemVerilog thread callbacks (600-605)
-    /// callback on thread creation
+    /// Callback on thread creation.
     StartOfThread = vpi_sys::cbStartOfThread,
     #[cfg(feature = "sv")]
-    /// callback on thread termination
+    /// Callback on thread termination.
     EndOfThread = vpi_sys::cbEndOfThread,
     #[cfg(feature = "sv")]
-    /// callback on reentering thread
+    /// Callback on thread reentry.
     EnterThread = vpi_sys::cbEnterThread,
     #[cfg(feature = "sv")]
-    /// callback on frame creation
+    /// Callback on frame creation.
     StartOfFrame = vpi_sys::cbStartOfFrame,
     #[cfg(feature = "sv")]
-    /// callback on frame exit
+    /// Callback on frame exit.
     EndOfFrame = vpi_sys::cbEndOfFrame,
     #[cfg(feature = "sv")]
-    /// callback on array variable size change
+    /// Callback on array variable size change.
     SizeChange = vpi_sys::cbSizeChange,
 
     #[cfg(feature = "sv")]
     // SystemVerilog assertion callbacks (606-662)
-    /// assertion starts
+    /// Assertion start.
     AssertionStart = vpi_sys::cbAssertionStart,
     #[cfg(feature = "sv")]
-    /// assertion succeeds
+    /// Assertion success.
     AssertionSuccess = vpi_sys::cbAssertionSuccess,
     #[cfg(feature = "sv")]
-    /// assertion fails
+    /// Assertion failure.
     AssertionFailure = vpi_sys::cbAssertionFailure,
     #[cfg(feature = "sv")]
-    /// assertion step succeeds
+    /// Assertion step success.
     AssertionStepSuccess = vpi_sys::cbAssertionStepSuccess,
     #[cfg(feature = "sv")]
-    /// assertion step fails
+    /// Assertion step failure.
     AssertionStepFailure = vpi_sys::cbAssertionStepFailure,
     #[cfg(feature = "sv")]
-    /// assertion disabled
+    /// Assertion disable.
     AssertionDisable = vpi_sys::cbAssertionDisable,
     #[cfg(feature = "sv")]
-    /// assertion enabled
+    /// Assertion enable.
     AssertionEnable = vpi_sys::cbAssertionEnable,
     #[cfg(feature = "sv")]
-    /// assertion reset
+    /// Assertion reset.
     AssertionReset = vpi_sys::cbAssertionReset,
     #[cfg(feature = "sv")]
-    /// assertion killed
+    /// Assertion kill.
     AssertionKill = vpi_sys::cbAssertionKill,
     #[cfg(feature = "sv")]
-    /// assertion system initialized
+    /// Assertion system initialization.
     AssertionSysInitialized = vpi_sys::cbAssertionSysInitialized,
     #[cfg(feature = "sv")]
-    /// assertion system on
+    /// Assertion system on.
     AssertionSysOn = vpi_sys::cbAssertionSysOn,
     #[cfg(feature = "sv")]
-    /// assertion system off
+    /// Assertion system off.
     AssertionSysOff = vpi_sys::cbAssertionSysOff,
     #[cfg(feature = "sv")]
-    /// assertion system end
+    /// Assertion system end.
     AssertionSysEnd = vpi_sys::cbAssertionSysEnd,
     #[cfg(feature = "sv")]
-    /// assertion system reset
+    /// Assertion system reset.
     AssertionSysReset = vpi_sys::cbAssertionSysReset,
     #[cfg(feature = "sv")]
-    /// assertion vacuous success
+    /// Assertion vacuous success.
     AssertionVacuousSuccess = vpi_sys::cbAssertionVacuousSuccess,
     #[cfg(feature = "sv")]
-    /// assertion disabled evaluation
+    /// Assertion disabled evaluation.
     AssertionDisabledEvaluation = vpi_sys::cbAssertionDisabledEvaluation,
     #[cfg(feature = "sv")]
-    /// assertion system lock
+    /// Assertion system lock.
     AssertionSysLock = vpi_sys::cbAssertionSysLock,
     #[cfg(feature = "sv")]
-    /// assertion system unlock
+    /// Assertion system unlock.
     AssertionSysUnlock = vpi_sys::cbAssertionSysUnlock,
     #[cfg(feature = "sv")]
-    /// assertion lock
+    /// Assertion lock.
     AssertionLock = vpi_sys::cbAssertionLock,
     #[cfg(feature = "sv")]
-    /// assertion unlock
+    /// Assertion unlock.
     AssertionUnlock = vpi_sys::cbAssertionUnlock,
     #[cfg(feature = "sv")]
-    /// assertion enable pass action
+    /// Assertion enable pass action.
     AssertionEnablePassAction = vpi_sys::cbAssertionEnablePassAction,
     #[cfg(feature = "sv")]
-    /// assertion enable fail action
+    /// Assertion enable fail action.
     AssertionEnableFailAction = vpi_sys::cbAssertionEnableFailAction,
     #[cfg(feature = "sv")]
-    /// assertion disable pass action
+    /// Assertion disable pass action.
     AssertionDisablePassAction = vpi_sys::cbAssertionDisablePassAction,
     #[cfg(feature = "sv")]
-    /// assertion disable fail action
+    /// Assertion disable fail action.
     AssertionDisableFailAction = vpi_sys::cbAssertionDisableFailAction,
     #[cfg(feature = "sv")]
-    /// assertion enable non-vacuous action
+    /// Assertion enable non-vacuous action.
     AssertionEnableNonvacuousAction = vpi_sys::cbAssertionEnableNonvacuousAction,
     #[cfg(feature = "sv")]
-    /// assertion disable vacuous action
+    /// Assertion disable vacuous action.
     AssertionDisableVacuousAction = vpi_sys::cbAssertionDisableVacuousAction,
     #[cfg(feature = "sv")]
-    /// assertion system enable pass action
+    /// Assertion system enable pass action.
     AssertionSysEnablePassAction = vpi_sys::cbAssertionSysEnablePassAction,
     #[cfg(feature = "sv")]
-    /// assertion system enable fail action
+    /// Assertion system enable fail action.
     AssertionSysEnableFailAction = vpi_sys::cbAssertionSysEnableFailAction,
     #[cfg(feature = "sv")]
-    /// assertion system disable pass action
+    /// Assertion system disable pass action.
     AssertionSysDisablePassAction = vpi_sys::cbAssertionSysDisablePassAction,
     #[cfg(feature = "sv")]
-    /// assertion system disable fail action
+    /// Assertion system disable fail action.
     AssertionSysDisableFailAction = vpi_sys::cbAssertionSysDisableFailAction,
     #[cfg(feature = "sv")]
-    /// assertion system enable non-vacuous action
+    /// Assertion system enable non-vacuous action.
     AssertionSysEnableNonvacuousAction = vpi_sys::cbAssertionSysEnableNonvacuousAction,
     #[cfg(feature = "sv")]
-    /// assertion system disable vacuous action
+    /// Assertion system disable vacuous action.
     AssertionSysDisableVacuousAction = vpi_sys::cbAssertionSysDisableVacuousAction,
 
     #[cfg(feature = "sv")]
     // SystemVerilog object callbacks (700-702)
-    /// callback on class object creation
+    /// Callback on class object creation.
     CreateObj = vpi_sys::cbCreateObj,
     #[cfg(feature = "sv")]
-    /// callback on class object reclaimed
+    /// Callback on class object reclamation.
     ReclaimObj = vpi_sys::cbReclaimObj,
     #[cfg(feature = "sv")]
-    /// callback on transient object deletion
+    /// Callback on transient object deletion.
     EndOfObject = vpi_sys::cbEndOfObject,
 }
 
