@@ -6,6 +6,7 @@ use vpi_sys::{vpiHandle, PLI_INT32};
 /// This type provides convenience helpers for common handle operations and
 /// iteration over child objects.
 pub struct Handle {
+    /// Underlying simulator-owned VPI handle pointer.
     handle: vpiHandle,
 }
 
@@ -102,6 +103,7 @@ impl Handle {
 
 /// Iterator over VPI scan results from `vpi_iterate`/`vpi_scan`.
 pub struct HandleIterator {
+    /// Internal iterator handle consumed by successive `vpi_scan` calls.
     pub(crate) iter: Handle,
 }
 

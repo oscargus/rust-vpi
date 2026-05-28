@@ -2,6 +2,7 @@ use std::ffi::CString;
 
 /// Multi-channel descriptor used by VPI for output streams.
 pub struct MCD {
+    /// Bitmask identifying one or more simulator output channels.
     mask: u32,
 }
 
