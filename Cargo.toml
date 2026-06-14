@@ -1,6 +1,6 @@
 [workspace]
-members = ["vpi", "vpi-sys", "examples/siminfo", "examples/timescale", "examples/dumper"]
-resolver = "2"
+members = ["vpi", "vpi-sys", "examples/*"]
+resolver = "3"
 
 [workspace.package]
 version = "0.1.0"
