@@ -956,7 +956,12 @@ mod tests {
     fn uint64_to_scalar_vector_converts_value() {
         assert_eq!(
             uint64_to_scalar_vector(0b1011, 4),
-            vec![ScalarValue::One, ScalarValue::Zero, ScalarValue::One, ScalarValue::One]
+            vec![
+                ScalarValue::One,
+                ScalarValue::Zero,
+                ScalarValue::One,
+                ScalarValue::One
+            ]
         );
     }
 
@@ -980,7 +985,12 @@ mod tests {
         // Only the lowest 4 bits of 0b11011 should appear
         assert_eq!(
             uint64_to_scalar_vector(0b11011, 4),
-            vec![ScalarValue::One, ScalarValue::Zero, ScalarValue::One, ScalarValue::One]
+            vec![
+                ScalarValue::One,
+                ScalarValue::Zero,
+                ScalarValue::One,
+                ScalarValue::One
+            ]
         );
     }
 
@@ -993,7 +1003,12 @@ mod tests {
     fn int64_to_scalar_vector_positive_value() {
         assert_eq!(
             int64_to_scalar_vector(5, 4),
-            vec![ScalarValue::Zero, ScalarValue::One, ScalarValue::Zero, ScalarValue::One]
+            vec![
+                ScalarValue::Zero,
+                ScalarValue::One,
+                ScalarValue::Zero,
+                ScalarValue::One
+            ]
         );
     }
 
@@ -1002,7 +1017,12 @@ mod tests {
         // -1 in 4-bit two's complement is 1111
         assert_eq!(
             int64_to_scalar_vector(-1, 4),
-            vec![ScalarValue::One, ScalarValue::One, ScalarValue::One, ScalarValue::One]
+            vec![
+                ScalarValue::One,
+                ScalarValue::One,
+                ScalarValue::One,
+                ScalarValue::One
+            ]
         );
     }
 
@@ -1011,27 +1031,47 @@ mod tests {
         // -8 in 4-bit two's complement is 1000
         assert_eq!(
             int64_to_scalar_vector(-8, 4),
-            vec![ScalarValue::One, ScalarValue::Zero, ScalarValue::Zero, ScalarValue::Zero]
+            vec![
+                ScalarValue::One,
+                ScalarValue::Zero,
+                ScalarValue::Zero,
+                ScalarValue::Zero
+            ]
         );
     }
 
     #[test]
     fn scalar_vector_to_int64_positive() {
-        let bits = vec![ScalarValue::Zero, ScalarValue::One, ScalarValue::Zero, ScalarValue::One];
+        let bits = vec![
+            ScalarValue::Zero,
+            ScalarValue::One,
+            ScalarValue::Zero,
+            ScalarValue::One,
+        ];
         assert_eq!(scalar_vector_to_int64(&bits), Some(5));
     }
 
     #[test]
     fn scalar_vector_to_int64_negative() {
         // 1111 in two's complement is -1
-        let bits = vec![ScalarValue::One, ScalarValue::One, ScalarValue::One, ScalarValue::One];
+        let bits = vec![
+            ScalarValue::One,
+            ScalarValue::One,
+            ScalarValue::One,
+            ScalarValue::One,
+        ];
         assert_eq!(scalar_vector_to_int64(&bits), Some(-1));
     }
 
     #[test]
     fn scalar_vector_to_int64_min_negative() {
         // 1000 in 4-bit two's complement is -8
-        let bits = vec![ScalarValue::One, ScalarValue::Zero, ScalarValue::Zero, ScalarValue::Zero];
+        let bits = vec![
+            ScalarValue::One,
+            ScalarValue::Zero,
+            ScalarValue::Zero,
+            ScalarValue::Zero,
+        ];
         assert_eq!(scalar_vector_to_int64(&bits), Some(-8));
     }
 
@@ -1069,7 +1109,10 @@ mod tests {
                 ScalarValue::One,
                 ScalarValue::One,
             ];
-            assert_eq!(scalar_vector_to_biguint(&bits), Some(BigUint::from(0b1011u32)));
+            assert_eq!(
+                scalar_vector_to_biguint(&bits),
+                Some(BigUint::from(0b1011u32))
+            );
         }
 
         #[test]
@@ -1100,17 +1143,19 @@ mod tests {
             let mut bits = vec![ScalarValue::Zero; 64];
             bits.push(ScalarValue::One);
             // 65-bit value: should still work (no 64-bit limit)
-            assert_eq!(
-                scalar_vector_to_biguint(&bits),
-                Some(BigUint::from(1u32))
-            );
+            assert_eq!(scalar_vector_to_biguint(&bits), Some(BigUint::from(1u32)));
         }
 
         #[test]
         fn biguint_to_scalar_vector_converts_value() {
             assert_eq!(
                 biguint_to_scalar_vector(&BigUint::from(0b1011u32), 4),
-                vec![ScalarValue::One, ScalarValue::Zero, ScalarValue::One, ScalarValue::One]
+                vec![
+                    ScalarValue::One,
+                    ScalarValue::Zero,
+                    ScalarValue::One,
+                    ScalarValue::One
+                ]
             );
         }
 
@@ -1134,7 +1179,12 @@ mod tests {
             // Only the lowest 4 bits of 0b11011 should appear
             assert_eq!(
                 biguint_to_scalar_vector(&BigUint::from(0b11011u32), 4),
-                vec![ScalarValue::One, ScalarValue::Zero, ScalarValue::One, ScalarValue::One]
+                vec![
+                    ScalarValue::One,
+                    ScalarValue::Zero,
+                    ScalarValue::One,
+                    ScalarValue::One
+                ]
             );
         }
 
@@ -1155,7 +1205,12 @@ mod tests {
         fn bigint_to_scalar_vector_positive_value() {
             assert_eq!(
                 bigint_to_scalar_vector(&BigInt::from(5), 4),
-                vec![ScalarValue::Zero, ScalarValue::One, ScalarValue::Zero, ScalarValue::One]
+                vec![
+                    ScalarValue::Zero,
+                    ScalarValue::One,
+                    ScalarValue::Zero,
+                    ScalarValue::One
+                ]
             );
         }
 
@@ -1164,7 +1219,12 @@ mod tests {
             // -1 in 4-bit two's complement is 1111
             assert_eq!(
                 bigint_to_scalar_vector(&BigInt::from(-1), 4),
-                vec![ScalarValue::One, ScalarValue::One, ScalarValue::One, ScalarValue::One]
+                vec![
+                    ScalarValue::One,
+                    ScalarValue::One,
+                    ScalarValue::One,
+                    ScalarValue::One
+                ]
             );
         }
 
@@ -1177,14 +1237,24 @@ mod tests {
 
         #[test]
         fn scalar_vector_to_bigint_positive() {
-            let bits = vec![ScalarValue::Zero, ScalarValue::One, ScalarValue::Zero, ScalarValue::One];
+            let bits = vec![
+                ScalarValue::Zero,
+                ScalarValue::One,
+                ScalarValue::Zero,
+                ScalarValue::One,
+            ];
             assert_eq!(scalar_vector_to_bigint(&bits), Some(BigInt::from(5)));
         }
 
         #[test]
         fn scalar_vector_to_bigint_negative_one() {
             // 1111 in 4-bit two's complement is -1
-            let bits = vec![ScalarValue::One, ScalarValue::One, ScalarValue::One, ScalarValue::One];
+            let bits = vec![
+                ScalarValue::One,
+                ScalarValue::One,
+                ScalarValue::One,
+                ScalarValue::One,
+            ];
             assert_eq!(scalar_vector_to_bigint(&bits), Some(BigInt::from(-1)));
         }
 
