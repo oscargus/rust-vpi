@@ -178,10 +178,10 @@ pub enum ScalarValue {
     Zero = vpi_sys::vpi0,
     /// Logic `1`.
     One = vpi_sys::vpi1,
-    /// Unknown logic state.
-    X = vpi_sys::vpiX,
     /// High-impedance state.
     Z = vpi_sys::vpiZ,
+    /// Unknown logic state.
+    X = vpi_sys::vpiX,
     /// Weak high state.
     H = vpi_sys::vpiH,
     /// Weak low state.
