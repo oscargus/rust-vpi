@@ -3,7 +3,7 @@ members = ["vpi", "vpi-sys", "examples/*"]
 resolver = "2"
 
 [workspace.package]
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 rust-version = "1.82"
 license = "MIT"
@@ -16,5 +16,5 @@ bitflags = "2"
 num-bigint = "0.4"
 num-traits = "0.2"
 num-derive = "0.4"
-vpi-sys = { version = "0.1.0", path = "vpi-sys" }
-vpi = { version = "0.1.0", path = "vpi" }
+vpi-sys = { version = "0.1.1", path = "vpi-sys" }
+vpi = { version = "0.1.1", path = "vpi" }
