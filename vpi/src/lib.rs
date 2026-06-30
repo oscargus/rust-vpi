@@ -1,4 +1,11 @@
 //! Safe and ergonomic wrappers for selected Verilog VPI APIs.
+//!
+//! # Features
+//!
+//! | Feature | Description |
+//! |---------|-------------|
+//! | `sv`     | Enables SystemVerilog VPI extensions (types, callbacks, and properties defined in IEEE 1800). |
+//! | `bigint` | Enables conversion between [`ScalarValue`] slices and arbitrary-precision integers using [`num_bigint::BigInt`] and [`num_bigint::BigUint`]. |
 
 #[macro_use]
 mod macros;
