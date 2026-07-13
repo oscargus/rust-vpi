@@ -7,7 +7,7 @@ rust-version.workspace = true
 license.workspace = true
 authors.workspace = true
 repository.workspace = true
-keywords = ["vpi", "verilog", "systemverilog", "ffi", "hardware-simulation", "bindings"]
+keywords = ["vpi", "verilog", "systemverilog", "ffi", "bindings"]
 categories = ["external-ffi-bindings", "simulation"]
 description = "Low-level FFI bindings to the Verilog and SystemVerilog VPI C API, generated with bindgen. This crate is not intended for direct use; use the safe `vpi` crate instead."
 
