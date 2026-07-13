@@ -6,8 +6,8 @@ This crate exports VPI entry points and resolves simulator symbols dynamically a
 
 ## Platform behavior
 
-- Windows: Uses dynamic loading (`libloading`) to resolve symbols from simulator libraries.
-- macOS: Uses dynamic linker APIs to resolve symbols at runtime.
+- Windows: Resolves symbols from the host process using `GetModuleHandleA` and `GetProcAddress`.
+- macOS: Resolves symbols with `dlsym` (first `RTLD_DEFAULT`, then the host module from `dlopen(NULL, RTLD_NOW)`).
 - Linux: Typically not required because plugin symbol resolution is usually handled by the simulator loader.
 
 ## How it is used

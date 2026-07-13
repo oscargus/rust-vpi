@@ -6,74 +6,73 @@
 
 #![allow(non_snake_case)]
 
+#[cfg(target_os = "macos")]
+use std::ffi::c_int;
 #[cfg(any(target_os = "windows", target_os = "macos"))]
-use std::ffi::c_void;
+use std::ffi::{c_char, c_void};
 #[cfg(any(target_os = "windows", target_os = "macos"))]
 use std::sync::OnceLock;
 
 #[cfg(any(target_os = "windows", target_os = "macos"))]
 fn missing_symbol(name: &str) -> ! {
-    eprintln!(
-        "vpi-shim: failed to resolve symbol '{name}'. On Windows, set VPI_SHIM_LIB to the simulator DLL path if auto-discovery fails."
-    );
+    eprintln!("vpi-shim: failed to resolve symbol '{name}'.");
     std::process::abort();
 }
 
 #[cfg(target_os = "macos")]
 unsafe fn resolve_symbol(name: &[u8]) -> *mut c_void {
-    let ptr = unsafe { libc::dlsym(libc::RTLD_NEXT, name.as_ptr().cast()) };
-    if !ptr.is_null() {
-        return ptr;
+    unsafe extern "C" {
+        fn dlopen(filename: *const c_char, flags: c_int) -> *mut c_void;
+        fn dlsym(handle: *mut c_void, symbol: *const c_char) -> *mut c_void;
     }
-    unsafe { libc::dlsym(libc::RTLD_DEFAULT, name.as_ptr().cast()) }
+
+    const RTLD_NOW: c_int = 0x2;
+    const RTLD_DEFAULT: *mut c_void = (-2isize) as *mut c_void;
+
+    static HOST_MODULE: OnceLock<usize> = OnceLock::new();
+
+    fn host_module() -> *mut c_void {
+        let module = *HOST_MODULE.get_or_init(|| unsafe {
+            let module = dlopen(std::ptr::null(), RTLD_NOW);
+            if module.is_null() {
+                eprintln!("vpi-shim: dlopen(NULL, RTLD_NOW) failed");
+                std::process::abort();
+            }
+            module as usize
+        });
+        module as *mut c_void
+    }
+
+    let mut ptr = unsafe { dlsym(RTLD_DEFAULT, name.as_ptr().cast()) };
+    if ptr.is_null() {
+        ptr = unsafe { dlsym(host_module(), name.as_ptr().cast()) };
+    }
+    ptr
 }
 
 #[cfg(target_os = "windows")]
 unsafe fn resolve_symbol(name: &[u8]) -> *mut c_void {
-    use libloading::os::windows::Library;
-
-    fn candidate_libraries() -> Vec<String> {
-        let mut names = Vec::new();
-
-        if let Ok(path) = std::env::var("VPI_SHIM_LIB") {
-            for p in path.split(';').map(str::trim).filter(|s| !s.is_empty()) {
-                names.push(p.to_string());
-            }
-        }
-
-        // Common simulator/runtime library names. Users can override via VPI_SHIM_LIB.
-        names.extend([
-            "vpi.dll".to_string(),
-            "iverilog-vpi.dll".to_string(),
-            "modelsim.dll".to_string(),
-            "questa.dll".to_string(),
-        ]);
-
-        names
+    #[link(name = "kernel32")]
+    unsafe extern "system" {
+        fn GetModuleHandleA(module_name: *const c_char) -> *mut c_void;
+        fn GetProcAddress(module: *mut c_void, proc_name: *const c_char) -> *mut c_void;
     }
 
-    static LIBRARIES: OnceLock<Vec<Library>> = OnceLock::new();
+    static HOST_MODULE: OnceLock<usize> = OnceLock::new();
 
-    let libraries = LIBRARIES.get_or_init(|| {
-        let mut libs = Vec::new();
-        for name in candidate_libraries() {
-            if let Ok(lib) = unsafe { Library::new(&name) } {
-                libs.push(lib);
+    fn host_module() -> *mut c_void {
+        let module = *HOST_MODULE.get_or_init(|| unsafe {
+            let module = GetModuleHandleA(std::ptr::null());
+            if module.is_null() {
+                eprintln!("vpi-shim: GetModuleHandleA(NULL) failed");
+                std::process::abort();
             }
-        }
-        libs
-    });
-
-    for lib in libraries {
-        if let Ok(sym) = unsafe { lib.get::<*mut c_void>(name) } {
-            let ptr = *sym;
-            if !ptr.is_null() {
-                return ptr;
-            }
-        }
+            module as usize
+        });
+        module as *mut c_void
     }
 
-    std::ptr::null_mut()
+    unsafe { GetProcAddress(host_module(), name.as_ptr().cast()) }
 }
 
 #[cfg(any(target_os = "windows", target_os = "macos"))]
