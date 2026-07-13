@@ -5,6 +5,7 @@ use vpi_sys::{vpiHandle, PLI_INT32};
 ///
 /// This type provides convenience helpers for common handle operations and
 /// iteration over child objects.
+#[derive(Debug)]
 pub struct Handle {
     /// Underlying simulator-owned VPI handle pointer.
     handle: vpiHandle,

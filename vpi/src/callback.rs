@@ -1,9 +1,11 @@
-use crate::{Handle, Time};
+use crate::{value::decode_vpi_value, Handle, Time, Value, ValueType};
+use num_traits::FromPrimitive;
 
 /// VPI callback reasons used when registering simulator callbacks.
 ///
 /// These values map directly to `vpi_sys::cb*` constants.
 #[repr(u32)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, num_derive::FromPrimitive)]
 pub enum CbReason {
     /// Callback on value change.
     ValueChange = vpi_sys::cbValueChange,
@@ -202,6 +204,7 @@ pub enum CbReason {
 ///
 /// This mirrors the fields used by `vpi_register_cb` and is useful when
 /// constructing callback registrations manually.
+#[derive(Debug)]
 pub struct Callback {
     /// Event reason that triggers the callback.
     pub reason: CbReason,
@@ -218,9 +221,31 @@ pub struct Callback {
 }
 
 /// Safe callback data passed to Rust closures.
+#[derive(Debug)]
 pub struct CbData {
+    /// Callback reason.
+    pub reason: CbReason,
     /// Object handle associated with the callback invocation.
     pub obj: Handle,
+    /// Optional callback time payload.
+    pub time: Option<Time>,
+    /// Optional callback value payload.
+    pub value: Option<Value>,
+    /// Optional value format.
+    pub value_type: Option<ValueType>,
+    /// Callback index payload. Meaning depends on callback reason; may be unused for some callbacks.
+    pub index: i32,
+}
+
+fn time_from_cb_data(raw_time: vpi_sys::s_vpi_time) -> Option<Time> {
+    match raw_time.type_ as u32 {
+        vpi_sys::vpiSimTime => Some(Time::Sim(
+            u64::from(raw_time.high) << 32 | u64::from(raw_time.low),
+        )),
+        vpi_sys::vpiScaledRealTime => Some(Time::ScaledReal(raw_time.real)),
+        vpi_sys::vpiSuppressTime => Some(Time::Suppress),
+        _ => None,
+    }
 }
 
 impl Handle {
@@ -263,8 +288,25 @@ where
         return 0; // No user data, just return
     }
 
+    let cb_data_ref = unsafe { &*cb_data };
+    let value = if cb_data_ref.value.is_null() {
+        None
+    } else {
+        Some(unsafe { *cb_data_ref.value })
+    };
+
     let mut data = CbData {
-        obj: Handle::from_raw(unsafe { (*cb_data).obj }),
+        reason: CbReason::from_u32(cb_data_ref.reason as u32)
+            .expect("received unknown callback reason from simulator"),
+        obj: Handle::from_raw(cb_data_ref.obj),
+        time: if cb_data_ref.time.is_null() {
+            None
+        } else {
+            time_from_cb_data(unsafe { *cb_data_ref.time })
+        },
+        value: value.and_then(|raw| decode_vpi_value(raw, cb_data_ref.obj)),
+        value_type: value.and_then(|raw| ValueType::from_u32(raw.format as u32)),
+        index: cb_data_ref.index,
     };
 
     let callback = unsafe { &*user_data };

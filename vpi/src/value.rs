@@ -366,6 +366,71 @@ pub fn vector_value_to_scalar_vector(
     result
 }
 
+/// Decode a raw `t_vpi_value` into a high-level [`Value`].
+///
+/// `obj` is used for value formats that require object context (for example,
+/// vector width when decoding `vpiVectorVal`).
+#[must_use]
+pub(crate) fn decode_vpi_value(
+    raw_value: vpi_sys::t_vpi_value,
+    obj: vpi_sys::vpiHandle,
+) -> Option<Value> {
+    match raw_value.format as u32 {
+        vpi_sys::vpiBinStrVal => {
+            let c_str = unsafe { std::ffi::CStr::from_ptr(raw_value.value.str_) };
+            Some(Value::BinStr(c_str.to_str().unwrap_or("").to_string()))
+        }
+        vpi_sys::vpiOctStrVal => {
+            let c_str = unsafe { std::ffi::CStr::from_ptr(raw_value.value.str_) };
+            Some(Value::OctStr(c_str.to_str().unwrap_or("").to_string()))
+        }
+        vpi_sys::vpiHexStrVal => {
+            let c_str = unsafe { std::ffi::CStr::from_ptr(raw_value.value.str_) };
+            Some(Value::HexStr(c_str.to_str().unwrap_or("").to_string()))
+        }
+        vpi_sys::vpiDecStrVal => {
+            let c_str = unsafe { std::ffi::CStr::from_ptr(raw_value.value.str_) };
+            Some(Value::DecStr(c_str.to_str().unwrap_or("").to_string()))
+        }
+        vpi_sys::vpiScalarVal => Some(Value::Scalar(
+            ScalarValue::from_u32(unsafe { raw_value.value.integer } as u32)
+                .unwrap_or(ScalarValue::DontCare),
+        )),
+        vpi_sys::vpiIntVal => Some(Value::Int(unsafe { raw_value.value.integer })),
+        vpi_sys::vpiRealVal => Some(Value::Real(unsafe { raw_value.value.real })),
+        vpi_sys::vpiStringVal => {
+            let c_str = unsafe { std::ffi::CStr::from_ptr(raw_value.value.str_) };
+            Some(Value::String(c_str.to_str().unwrap_or("").to_string()))
+        }
+        vpi_sys::vpiObjTypeVal => Some(Value::ObjType(unsafe { raw_value.value.integer })),
+        vpi_sys::vpiVectorVal => {
+            let vec_ptr = unsafe { raw_value.value.vector };
+            if vec_ptr.is_null() {
+                Some(Value::Vector(vec![]))
+            } else {
+                let size = if obj.is_null() {
+                    0usize
+                } else {
+                    unsafe { vpi_sys::vpi_get(vpi_sys::vpiSize as i32, obj) as usize }
+                };
+                let num_words = size.div_ceil(32);
+                let vec = unsafe { std::slice::from_raw_parts(vec_ptr, num_words) };
+                Some(Value::Vector(vector_value_to_scalar_vector(vec, size)))
+            }
+        }
+        vpi_sys::vpiStrengthVal => {
+            let strength: vpi_sys::t_vpi_strengthval = unsafe { *raw_value.value.strength };
+            Some(Value::Strength(StrengthValue::from(strength)))
+        }
+        vpi_sys::vpiTimeVal => {
+            let vpi_time: vpi_sys::t_vpi_time = unsafe { *raw_value.value.time };
+            Some(Value::Time(Time::from(vpi_time)))
+        }
+        vpi_sys::vpiShortIntVal => Some(Value::ShortInt(unsafe { raw_value.value.integer } as i16)),
+        _ => None,
+    }
+}
+
 /// Convert a binary-encoded [`ScalarValue`] slice (MSB at index 0) to a [`num_bigint::BigUint`].
 ///
 /// Returns `None` if any element is not a definite binary value
@@ -537,54 +602,7 @@ impl Handle {
             value: vpi_sys::t_vpi_value__bindgen_ty_1 { integer: 0 },
         };
         unsafe { vpi_sys::vpi_get_value(self.as_raw(), &raw mut value) };
-        let value = match value.format as u32 {
-            vpi_sys::vpiBinStrVal
-            | vpi_sys::vpiOctStrVal
-            | vpi_sys::vpiHexStrVal
-            | vpi_sys::vpiDecStrVal => {
-                let c_str = unsafe { std::ffi::CStr::from_ptr(value.value.str_) };
-                Value::BinStr(c_str.to_str().unwrap_or("").to_string())
-            }
-            vpi_sys::vpiScalarVal => Value::Scalar(
-                ScalarValue::from_u32(unsafe { value.value.integer } as u32)
-                    .unwrap_or(ScalarValue::DontCare),
-            ),
-            vpi_sys::vpiIntVal => Value::Int(unsafe { value.value.integer }),
-            vpi_sys::vpiRealVal => Value::Real(unsafe { value.value.real }),
-            vpi_sys::vpiStringVal => {
-                let c_str = unsafe { std::ffi::CStr::from_ptr(value.value.str_) };
-                Value::String(c_str.to_str().unwrap_or("").to_string())
-            }
-            vpi_sys::vpiObjTypeVal => Value::ObjType(unsafe { value.value.integer }),
-            vpi_sys::vpiVectorVal => {
-                let vec_ptr = unsafe { value.value.vector };
-                if vec_ptr.is_null() {
-                    Value::Vector(vec![])
-                } else {
-                    // Get the size (number of bits) from the object
-                    let size = unsafe { vpi_sys::vpi_get(vpi_sys::vpiSize as i32, self.as_raw()) }
-                        as usize;
-
-                    // Calculate how many vecval words we need (32 bits per word)
-                    let num_words = size.div_ceil(32);
-                    let vec = unsafe { std::slice::from_raw_parts(vec_ptr, num_words) };
-                    Value::Vector(vector_value_to_scalar_vector(vec, size))
-                }
-            }
-            vpi_sys::vpiStrengthVal => {
-                let strength: vpi_sys::t_vpi_strengthval = unsafe { *value.value.strength };
-                Value::Strength(StrengthValue::from(strength))
-            }
-            vpi_sys::vpiTimeVal => {
-                let vpi_time: vpi_sys::t_vpi_time = unsafe { *value.value.time };
-                Value::Time(Time::from(vpi_time))
-            }
-            vpi_sys::vpiShortIntVal => Value::ShortInt(unsafe { value.value.integer } as i16),
-
-            // For simplicity, other types are not fully implemented here
-            _ => return None,
-        };
-        Some(value)
+        decode_vpi_value(value, self.as_raw())
     }
 
     /// Retrieve an array of values from a Verilog object (e.g., memory array, packet array).
