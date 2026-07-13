@@ -9,4 +9,4 @@ vpi-sys is a simple bindgen-wrapper that automatically generates Rust-bindings.
 
 There are examples in `test_example` to see how the crate can be used.
 
-Both crates are licensed under the MIT license. However, I do not claim any license for the .h-file in vpi-sys, which are based on the IEEE 1800 standard.
+Both crates are licensed under the MIT license. However, I do not claim any license for the .h-files in vpi-sys, which are based on the IEEE 1800 standard.

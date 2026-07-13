@@ -1,11 +1,11 @@
 [workspace]
-members = ["vpi", "vpi-sys", "examples/*"]
+members = ["vpi", "vpi-sys", "vpi-shim", "examples/*"]
 resolver = "2"
 
 [workspace.package]
 version = "0.1.1"
 edition = "2021"
-rust-version = "1.82"
+rust-version = "1.88"
 license = "MIT"
 authors = ["Oscar Gustafsson <oscar.gustafsson@gmail.com>"]
 repository = "https://github.com/oscargus/rust-vpi"
@@ -13,8 +13,9 @@ repository = "https://github.com/oscargus/rust-vpi"
 [workspace.dependencies]
 bindgen = "0.72.1"
 bitflags = "2"
-num-bigint = "0.4"
+num-bigint = "0.5"
 num-traits = "0.2"
 num-derive = "0.4"
 vpi-sys = { version = "0.1.1", path = "vpi-sys" }
 vpi = { version = "0.1.1", path = "vpi" }
+vpi-shim = { version = "0.1.1", path = "vpi-shim" }
