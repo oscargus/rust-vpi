@@ -1,3 +1,4 @@
+use crate::Time;
 use vpi_sys::PLI_INT32;
 
 /// Returns simulator invocation metadata from `vpi_get_vlog_info`.
@@ -78,6 +79,22 @@ pub fn simulator_version() -> String {
         .to_str()
         .unwrap_or("Unknown")
         .to_string()
+}
+
+/// Returns the current simulation time.
+///
+/// This uses `vpi_get_time` with a null handle, which requests the simulator's
+/// current global simulation time.
+#[must_use]
+pub fn current_simulation_time() -> Time {
+    let mut vpi_time = vpi_sys::s_vpi_time {
+        type_: vpi_sys::vpiSimTime as i32,
+        high: 0,
+        low: 0,
+        real: 0.0,
+    };
+    unsafe { vpi_sys::vpi_get_time(std::ptr::null_mut(), &raw mut vpi_time) };
+    Time::from(vpi_time)
 }
 
 /// Represents a module's timescale information

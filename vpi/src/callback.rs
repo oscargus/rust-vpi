@@ -248,6 +248,70 @@ fn time_from_cb_data(raw_time: vpi_sys::s_vpi_time) -> Option<Time> {
     }
 }
 
+struct CallbackState {
+    callback: Box<dyn Fn(&CbData)>,
+    time: Option<Box<vpi_sys::t_vpi_time>>,
+    value: Option<Box<vpi_sys::t_vpi_value>>,
+}
+
+fn default_cb_time() -> vpi_sys::t_vpi_time {
+    vpi_sys::t_vpi_time {
+        type_: vpi_sys::vpiSimTime as i32,
+        high: 0,
+        low: 0,
+        real: 0.0,
+    }
+}
+
+fn default_cb_value() -> vpi_sys::t_vpi_value {
+    vpi_sys::t_vpi_value {
+        format: vpi_sys::vpiObjTypeVal as i32,
+        value: vpi_sys::t_vpi_value__bindgen_ty_1 { integer: 0 },
+    }
+}
+
+fn register_with_state(
+    reason: CbReason,
+    obj: vpi_sys::vpiHandle,
+    state: Box<CallbackState>,
+) -> Handle {
+    let state_ptr = Box::into_raw(state);
+    let state_ref = unsafe { &mut *state_ptr };
+
+    let handle = unsafe {
+        let mut cb_data = vpi_sys::s_cb_data {
+            reason: reason as i32,
+            cb_rtn: Some(trampoline),
+            obj,
+            time: std::ptr::from_mut(
+                state_ref
+                    .time
+                    .as_mut()
+                    .expect("register_with_state requires time storage")
+                    .as_mut(),
+            ),
+            value: std::ptr::from_mut(
+                state_ref
+                    .value
+                    .as_mut()
+                    .expect("register_with_state requires value storage")
+                    .as_mut(),
+            ),
+            index: 0,
+            user_data: state_ptr.cast::<i8>(),
+        };
+        vpi_sys::vpi_register_cb(&raw mut cb_data)
+    };
+
+    if handle.is_null() {
+        unsafe {
+            let _ = Box::from_raw(state_ptr);
+        }
+    }
+
+    Handle::from_raw(handle)
+}
+
 impl Handle {
     /// Registers a callback associated with this handle.
     ///
@@ -256,13 +320,17 @@ impl Handle {
     where
         F: Fn(&CbData) + 'static,
     {
-        let boxed: Box<F> = Box::new(callback);
-        let user_data = Box::into_raw(boxed).cast::<std::os::raw::c_void>();
+        let user_data = Box::into_raw(Box::new(CallbackState {
+            callback: Box::new(callback),
+            time: None,
+            value: None,
+        }))
+        .cast::<std::os::raw::c_void>();
 
         let handle = unsafe {
             let mut cb_data = vpi_sys::s_cb_data {
                 reason: reason as i32,
-                cb_rtn: Some(trampoline::<F>),
+                cb_rtn: Some(trampoline),
                 obj: self.as_raw(),
                 time: std::ptr::null_mut(),
                 value: std::ptr::null_mut(),
@@ -271,19 +339,40 @@ impl Handle {
             };
             vpi_sys::vpi_register_cb(&raw mut cb_data)
         };
+
+        if handle.is_null() {
+            unsafe {
+                let _ = Box::from_raw(user_data.cast::<CallbackState>());
+            }
+        }
+
         Handle::from_raw(handle)
+    }
+
+    /// Registers a callback with persistent time/value registration buffers.
+    ///
+    /// This variant populates `t_cb_data.time` and `t_cb_data.value` at
+    /// registration time so simulators can write callback payloads through
+    /// those pointers.
+    pub fn register_full_cb<F>(&self, reason: CbReason, callback: F) -> Handle
+    where
+        F: Fn(&CbData) + 'static,
+    {
+        let state = Box::new(CallbackState {
+            callback: Box::new(callback),
+            time: Some(Box::new(default_cb_time())),
+            value: Some(Box::new(default_cb_value())),
+        });
+        register_with_state(reason, self.as_raw(), state)
     }
 }
 
-unsafe extern "C" fn trampoline<F>(cb_data: *mut vpi_sys::t_cb_data) -> i32
-where
-    F: Fn(&CbData),
-{
+unsafe extern "C" fn trampoline(cb_data: *mut vpi_sys::t_cb_data) -> i32 {
     if cb_data.is_null() {
         return 0; // No callback data, just return
     }
 
-    let user_data = unsafe { (*cb_data).user_data.cast::<F>() };
+    let user_data = unsafe { (*cb_data).user_data.cast::<CallbackState>() };
     if user_data.is_null() {
         return 0; // No user data, just return
     }
@@ -309,8 +398,8 @@ where
         index: cb_data_ref.index,
     };
 
-    let callback = unsafe { &*user_data };
-    callback(&data);
+    let state = unsafe { &*user_data };
+    (state.callback)(&data);
 
     data.obj.clear(); // We do not own this handle
     0 // Return 0 to indicate success
@@ -323,13 +412,17 @@ pub fn register_cb<F>(reason: CbReason, callback: F) -> Handle
 where
     F: Fn(&CbData) + 'static,
 {
-    let boxed: Box<F> = Box::new(callback);
-    let user_data = Box::into_raw(boxed).cast::<std::os::raw::c_void>();
+    let user_data = Box::into_raw(Box::new(CallbackState {
+        callback: Box::new(callback),
+        time: None,
+        value: None,
+    }))
+    .cast::<std::os::raw::c_void>();
 
     let handle = unsafe {
         let mut cb_data = vpi_sys::s_cb_data {
             reason: reason as i32,
-            cb_rtn: Some(trampoline::<F>),
+            cb_rtn: Some(trampoline),
             obj: std::ptr::null_mut(),
             time: std::ptr::null_mut(),
             value: std::ptr::null_mut(),
@@ -338,7 +431,31 @@ where
         };
         vpi_sys::vpi_register_cb(&raw mut cb_data)
     };
+
+    if handle.is_null() {
+        unsafe {
+            let _ = Box::from_raw(user_data.cast::<CallbackState>());
+        }
+    }
+
     Handle::from_raw(handle)
+}
+
+/// Registers a global callback with persistent time/value registration buffers.
+///
+/// This variant populates `t_cb_data.time` and `t_cb_data.value` at
+/// registration time so simulators can write callback payloads through
+/// those pointers.
+pub fn register_full_cb<F>(reason: CbReason, callback: F) -> Handle
+where
+    F: Fn(&CbData) + 'static,
+{
+    let state = Box::new(CallbackState {
+        callback: Box::new(callback),
+        time: Some(Box::new(default_cb_time())),
+        value: Some(Box::new(default_cb_value())),
+    });
+    register_with_state(reason, std::ptr::null_mut(), state)
 }
 
 /// Registers a time-based callback.
@@ -349,22 +466,12 @@ pub fn register_cb_with_time<F>(reason: CbReason, time: Time, callback: F) -> Ha
 where
     F: Fn(&CbData) + 'static,
 {
-    let boxed: Box<F> = Box::new(callback);
-    let user_data = Box::into_raw(boxed).cast::<i8>();
-
-    let handle = unsafe {
-        let mut cb_data = vpi_sys::s_cb_data {
-            reason: reason as i32,
-            cb_rtn: Some(trampoline::<F>),
-            obj: std::ptr::null_mut(),
-            time: std::ptr::from_mut(&mut time.into()),
-            value: std::ptr::null_mut(),
-            index: 0,
-            user_data,
-        };
-        vpi_sys::vpi_register_cb(&raw mut cb_data)
-    };
-    Handle::from_raw(handle)
+    let state = Box::new(CallbackState {
+        callback: Box::new(callback),
+        time: Some(Box::new(time.into())),
+        value: Some(Box::new(default_cb_value())),
+    });
+    register_with_state(reason, std::ptr::null_mut(), state)
 }
 
 /// Removes a previously registered callback.
@@ -373,9 +480,20 @@ where
 pub fn remove_cb(handle: &Handle) {
     if !handle.is_null() {
         unsafe {
+            let mut cb_data = vpi_sys::s_cb_data {
+                reason: 0,
+                cb_rtn: None,
+                obj: std::ptr::null_mut(),
+                time: std::ptr::null_mut(),
+                value: std::ptr::null_mut(),
+                index: 0,
+                user_data: std::ptr::null_mut(),
+            };
+            vpi_sys::vpi_get_cb_info(handle.as_raw(), &raw mut cb_data);
             vpi_sys::vpi_remove_cb(handle.as_raw());
-            // SAFETY: We assume the callback was registered with a Box, so we can safely reconstruct it and drop it
-            let _ = Box::from_raw(handle.as_raw().cast::<i8>());
+            if !cb_data.user_data.is_null() {
+                let _ = Box::from_raw(cb_data.user_data.cast::<CallbackState>());
+            }
         }
     }
 }
