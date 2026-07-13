@@ -146,6 +146,7 @@ forward_fn! {
 
 #[cfg(any(target_os = "windows", target_os = "macos"))]
 forward_fn_void! {
+    fn vpi_get_cb_info(object: vpi_sys::vpiHandle, cb_data_p: vpi_sys::p_cb_data);
     fn vpi_get_time(object: vpi_sys::vpiHandle, time_p: vpi_sys::p_vpi_time);
     fn vpi_get_value(expr: vpi_sys::vpiHandle, value_p: vpi_sys::p_vpi_value);
     fn vpi_get_value_array(
