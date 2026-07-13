@@ -71,6 +71,17 @@ impl Time {
             Time::Suppress => vpi_sys::vpiSuppressTime as i32,
         }
     }
+
+    /// Returns the simulation tick value for [`Time::Sim`].
+    ///
+    /// Returns `None` for non-integer time kinds.
+    #[must_use]
+    pub fn to_u64(&self) -> Option<u64> {
+        match self {
+            Time::Sim(value) => Some(*value),
+            Time::ScaledReal(_) | Time::Suppress => None,
+        }
+    }
 }
 
 impl Handle {
@@ -154,6 +165,13 @@ mod tests {
             vpi_sys::vpiScaledRealTime as i32
         );
         assert_eq!(Time::Suppress.time_type(), vpi_sys::vpiSuppressTime as i32);
+    }
+
+    #[test]
+    fn to_u64_returns_sim_value_only() {
+        assert_eq!(Time::Sim(123).to_u64(), Some(123));
+        assert_eq!(Time::ScaledReal(1.0).to_u64(), None);
+        assert_eq!(Time::Suppress.to_u64(), None);
     }
 
     #[test]
