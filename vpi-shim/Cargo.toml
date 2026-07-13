@@ -12,9 +12,3 @@ description = "Runtime symbol shim for VPI plugins on platforms that require exp
 
 [dependencies]
 vpi-sys.workspace = true
-
-[target.'cfg(target_os = "windows")'.dependencies]
-libloading = "0.9"
-
-[target.'cfg(target_os = "macos")'.dependencies]
-libc = "0.2"
