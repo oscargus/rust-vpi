@@ -363,7 +363,7 @@ impl Handle {
     {
         let state = Box::new(CallbackState {
             callback: Box::new(callback),
-            time: None,
+            time: Some(Box::new(default_cb_time())),
             value: Some(Box::new(cb_value_with_format(value_type))),
         });
         register_with_state(CbReason::ValueChange, self.as_raw(), state)
