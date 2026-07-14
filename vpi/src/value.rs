@@ -821,7 +821,7 @@ impl Handle {
             }
             ValueType::Scalar => {
                 // For scalar arrays
-                let mut rawvals: Vec<i8> = vec![0; size];
+                let mut rawvals: Vec<vpi_sys::PLI_BYTE8> = vec![0; size];
                 let mut arrayvalue = vpi_sys::t_vpi_arrayvalue {
                     format: vpi_sys::vpiScalarVal,
                     flags: 0,

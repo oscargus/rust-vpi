@@ -960,10 +960,7 @@ impl Handle {
     /// Returns this object's left range value, if available.
     #[must_use]
     pub fn get_left_range(&self) -> Option<i32> {
-        match self
-            .get(ObjectType::LeftRange)
-            .get_value(ValueType::Int)
-        {
+        match self.get(ObjectType::LeftRange).get_value(ValueType::Int) {
             Some(Value::Int(value)) => Some(value),
             _ => None,
         }
@@ -972,10 +969,7 @@ impl Handle {
     /// Returns this object's right range value, if available.
     #[must_use]
     pub fn get_right_range(&self) -> Option<i32> {
-        match self
-            .get(ObjectType::RightRange)
-            .get_value(ValueType::Int)
-        {
+        match self.get(ObjectType::RightRange).get_value(ValueType::Int) {
             Some(Value::Int(value)) => Some(value),
             _ => None,
         }

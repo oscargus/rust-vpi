@@ -123,6 +123,7 @@ macro_rules! forward_fn_void {
 forward_fn! {
     fn vpi_register_cb(cb_data_p: vpi_sys::p_cb_data) -> vpi_sys::vpiHandle;
     fn vpi_remove_cb(cb_obj: vpi_sys::vpiHandle) -> vpi_sys::PLI_INT32;
+    fn vpi_handle(type_: vpi_sys::PLI_INT32, refHandle: vpi_sys::vpiHandle) -> vpi_sys::vpiHandle;
     fn vpi_handle_by_name(name: *mut vpi_sys::PLI_BYTE8, scope: vpi_sys::vpiHandle) -> vpi_sys::vpiHandle;
     fn vpi_handle_by_index(object: vpi_sys::vpiHandle, indx: vpi_sys::PLI_INT32) -> vpi_sys::vpiHandle;
     fn vpi_iterate(type_: vpi_sys::PLI_INT32, refHandle: vpi_sys::vpiHandle) -> vpi_sys::vpiHandle;
