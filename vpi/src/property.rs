@@ -2,7 +2,7 @@ use num_derive::{FromPrimitive, ToPrimitive};
 use num_traits::FromPrimitive;
 use vpi_sys::PLI_INT32;
 
-use crate::{Handle, ObjectType};
+use crate::{Handle, ObjectType, Value, ValueType};
 
 /// VPI property identifiers used with `vpi_get` and `vpi_get_str`.
 ///
@@ -944,5 +944,40 @@ impl Handle {
         }
         let value = unsafe { vpi_sys::vpi_get(Property::Type as PLI_INT32, self.as_raw()) };
         ObjectType::from_u32(value as u32)
+    }
+
+    /// Returns this object's index value, if available.
+    #[must_use]
+    pub fn get_index(&self) -> Option<i32> {
+        if self.is_null() {
+            return None;
+        }
+
+        let raw_value = unsafe { vpi_sys::vpi_get(ObjectType::Index as PLI_INT32, self.as_raw()) };
+        Some(raw_value)
+    }
+
+    /// Returns this object's left range value, if available.
+    #[must_use]
+    pub fn get_left_range(&self) -> Option<i32> {
+        match self
+            .get(ObjectType::LeftRange)
+            .get_value(ValueType::Int)
+        {
+            Some(Value::Int(value)) => Some(value),
+            _ => None,
+        }
+    }
+
+    /// Returns this object's right range value, if available.
+    #[must_use]
+    pub fn get_right_range(&self) -> Option<i32> {
+        match self
+            .get(ObjectType::RightRange)
+            .get_value(ValueType::Int)
+        {
+            Some(Value::Int(value)) => Some(value),
+            _ => None,
+        }
     }
 }

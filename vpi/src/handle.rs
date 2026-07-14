@@ -87,6 +87,15 @@ impl Handle {
         }
     }
 
+    /// Returns a related object handle selected by `typ`.
+    ///
+    /// Returns a null handle when the relation is unavailable.
+    #[must_use]
+    pub fn get(&self, typ: ObjectType) -> Self {
+        let handle = unsafe { vpi_sys::vpi_handle(typ as PLI_INT32, self.as_raw()) };
+        Self::from_raw(handle)
+    }
+
     /// Returns a child handle by index.
     ///
     /// Returns a null handle when `index` is out of range.
