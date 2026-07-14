@@ -250,6 +250,13 @@ fn default_cb_value() -> vpi_sys::t_vpi_value {
     }
 }
 
+fn cb_value_with_format(value_type: ValueType) -> vpi_sys::t_vpi_value {
+    vpi_sys::t_vpi_value {
+        format: value_type as i32,
+        value: vpi_sys::t_vpi_value__bindgen_ty_1 { integer: 0 },
+    }
+}
+
 fn register_with_state(
     reason: CbReason,
     obj: vpi_sys::vpiHandle,
@@ -343,6 +350,23 @@ impl Handle {
             value: Some(Box::new(default_cb_value())),
         });
         register_with_state(reason, self.as_raw(), state)
+    }
+
+    /// Registers a value-change callback with an explicit value format.
+    ///
+    /// Some simulators require `t_cb_data.value.format` to match the expected
+    /// callback value encoding for `cbValueChange` callbacks. This helper sets
+    /// that format during registration.
+    pub fn register_value_change_cb<F>(&self, value_type: ValueType, callback: F) -> Handle
+    where
+        F: Fn(&CbData) + 'static,
+    {
+        let state = Box::new(CallbackState {
+            callback: Box::new(callback),
+            time: None,
+            value: Some(Box::new(cb_value_with_format(value_type))),
+        });
+        register_with_state(CbReason::ValueChange, self.as_raw(), state)
     }
 }
 
@@ -469,8 +493,7 @@ pub fn remove_cb(handle: &Handle) {
             };
             vpi_sys::vpi_get_cb_info(handle.as_raw(), &raw mut cb_data);
             vpi_sys::vpi_remove_cb(handle.as_raw());
-            let trampoline_ptr =
-                trampoline as unsafe extern "C" fn(*mut vpi_sys::t_cb_data) -> i32;
+            let trampoline_ptr = trampoline as unsafe extern "C" fn(*mut vpi_sys::t_cb_data) -> i32;
             let is_internal = cb_data
                 .cb_rtn
                 .map(|cb| (cb as usize) == (trampoline_ptr as usize))
