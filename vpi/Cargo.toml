@@ -6,7 +6,13 @@ rust-version.workspace = true
 license.workspace = true
 authors.workspace = true
 repository.workspace = true
-keywords = ["vpi", "verilog", "systemverilog", "bindings", "hardware-simulation"]
+keywords = [
+    "vpi",
+    "verilog",
+    "systemverilog",
+    "bindings",
+    "hardware-simulation",
+]
 categories = ["simulation", "api-bindings"]
 description = "Safe and ergonomic Rust bindings to the Verilog and SystemVerilog VPI C API for writing VPI applications in Rust."
 
