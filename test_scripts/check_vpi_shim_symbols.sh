@@ -10,8 +10,8 @@ if ! command -v rg >/dev/null 2>&1; then
   exit 1
 fi
 
-used_symbols="$(rg -Noh --no-line-number 'vpi_sys::(vpi_[A-Za-z0-9_]+)' vpi/src -r '$1' | sort -u)"
-forwarded_symbols="$(rg -Noh --no-line-number 'fn (vpi_[A-Za-z0-9_]+)\(' vpi-shim/src/lib.rs -r '$1' | sort -u)"
+used_symbols="$(rg -No --no-line-number --no-filename 'vpi_sys::(vpi_[A-Za-z0-9_]+)' vpi/src -r '$1' | sort -u)"
+forwarded_symbols="$(rg -No --no-line-number --no-filename 'fn (vpi_[A-Za-z0-9_]+)\(' vpi-shim/src/lib.rs -r '$1' | sort -u)"
 
 missing_symbols="$(comm -23 \
   <(printf '%s\n' "$used_symbols") \

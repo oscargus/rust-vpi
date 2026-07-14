@@ -47,8 +47,8 @@ pub fn printf(msg: impl AsRef<str>) {
     let cstr = string_to_ascii_cstring(msg);
     unsafe {
         vpi_sys::vpi_printf(
-            FMT.as_ptr().cast::<i8>().cast_mut(),
-            cstr.as_ptr().cast_mut(),
+            FMT.as_ptr().cast::<vpi_sys::PLI_BYTE8>().cast_mut(),
+            cstr.as_ptr().cast::<vpi_sys::PLI_BYTE8>().cast_mut(),
         )
     };
 }

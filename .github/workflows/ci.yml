@@ -29,6 +29,9 @@ jobs:
       matrix:
         toolchain: ["stable", "nightly", "1.88"]
         os: [ubuntu-latest, macos-latest, windows-latest]
+        include:
+          - os: ubuntu-24.04-arm
+            toolchain: stable
 
     runs-on: ${{ matrix.os }}
 

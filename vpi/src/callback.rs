@@ -200,26 +200,6 @@ pub enum CbReason {
     EndOfObject = vpi_sys::cbEndOfObject,
 }
 
-/// Raw callback registration descriptor.
-///
-/// This mirrors the fields used by `vpi_register_cb` and is useful when
-/// constructing callback registrations manually.
-#[derive(Debug)]
-pub struct Callback {
-    /// Event reason that triggers the callback.
-    pub reason: CbReason,
-    /// Native callback function pointer.
-    pub cb_rtn: Option<unsafe extern "C" fn(*mut vpi_sys::t_cb_data) -> i32>,
-    /// Optional object associated with the callback.
-    pub obj: Option<crate::Handle>,
-    /// Optional simulation time for time-based callbacks.
-    pub time: Option<crate::Time>,
-    /// Optional value payload used by value-based callbacks.
-    pub value: Option<crate::Value>,
-    /// Optional user data pointer passed back by the simulator.
-    pub user_data: Option<*mut i8>,
-}
-
 /// Safe callback data passed to Rust closures.
 #[derive(Debug)]
 pub struct CbData {
@@ -298,7 +278,7 @@ fn register_with_state(
                     .as_mut(),
             ),
             index: 0,
-            user_data: state_ptr.cast::<i8>(),
+            user_data: state_ptr.cast::<vpi_sys::PLI_BYTE8>(),
         };
         vpi_sys::vpi_register_cb(&raw mut cb_data)
     };
@@ -324,8 +304,7 @@ impl Handle {
             callback: Box::new(callback),
             time: None,
             value: None,
-        }))
-        .cast::<std::os::raw::c_void>();
+        }));
 
         let handle = unsafe {
             let mut cb_data = vpi_sys::s_cb_data {
@@ -335,14 +314,14 @@ impl Handle {
                 time: std::ptr::null_mut(),
                 value: std::ptr::null_mut(),
                 index: 0,
-                user_data: user_data.cast::<i8>(),
+                user_data: user_data.cast::<vpi_sys::PLI_BYTE8>(),
             };
             vpi_sys::vpi_register_cb(&raw mut cb_data)
         };
 
         if handle.is_null() {
             unsafe {
-                let _ = Box::from_raw(user_data.cast::<CallbackState>());
+                let _ = Box::from_raw(user_data);
             }
         }
 
@@ -416,8 +395,7 @@ where
         callback: Box::new(callback),
         time: None,
         value: None,
-    }))
-    .cast::<std::os::raw::c_void>();
+    }));
 
     let handle = unsafe {
         let mut cb_data = vpi_sys::s_cb_data {
@@ -427,14 +405,14 @@ where
             time: std::ptr::null_mut(),
             value: std::ptr::null_mut(),
             index: 0,
-            user_data: user_data.cast::<i8>(),
+            user_data: user_data.cast::<vpi_sys::PLI_BYTE8>(),
         };
         vpi_sys::vpi_register_cb(&raw mut cb_data)
     };
 
     if handle.is_null() {
         unsafe {
-            let _ = Box::from_raw(user_data.cast::<CallbackState>());
+            let _ = Box::from_raw(user_data);
         }
     }
 
@@ -491,7 +469,13 @@ pub fn remove_cb(handle: &Handle) {
             };
             vpi_sys::vpi_get_cb_info(handle.as_raw(), &raw mut cb_data);
             vpi_sys::vpi_remove_cb(handle.as_raw());
-            if !cb_data.user_data.is_null() {
+            let trampoline_ptr =
+                trampoline as unsafe extern "C" fn(*mut vpi_sys::t_cb_data) -> i32;
+            let is_internal = cb_data
+                .cb_rtn
+                .map(|cb| (cb as usize) == (trampoline_ptr as usize))
+                .unwrap_or(false);
+            if is_internal && !cb_data.user_data.is_null() {
                 let _ = Box::from_raw(cb_data.user_data.cast::<CallbackState>());
             }
         }
