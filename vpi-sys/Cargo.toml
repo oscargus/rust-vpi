@@ -11,13 +11,13 @@ keywords = ["vpi", "verilog", "systemverilog", "ffi", "bindings"]
 categories = ["external-ffi-bindings", "simulation"]
 description = "Low-level FFI bindings to the Verilog and SystemVerilog VPI C API, generated with bindgen. This crate is not intended for direct use; use the safe `vpi` crate instead."
 
-[build-dependencies]
-bindgen.workspace = true
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
 
 [features]
 default = []
 sv = []
 
-[package.metadata.docs.rs]
-all-features = true
-rustdoc-args = ["--cfg", "docsrs"]
+[build-dependencies]
+bindgen.workspace = true

@@ -1,5 +1,5 @@
 [workspace]
-members = ["vpi", "vpi-sys", "vpi-shim", "examples/*"]
+members = ["examples/*", "vpi", "vpi-shim", "vpi-sys"]
 resolver = "2"
 
 [workspace.package]
@@ -14,8 +14,8 @@ repository = "https://github.com/oscargus/rust-vpi"
 bindgen = "0.72.1"
 bitflags = "2"
 num-bigint = "0.5"
-num-traits = "0.2"
 num-derive = "0.4"
-vpi-sys = { version = "0.3.2", path = "vpi-sys" }
+num-traits = "0.2"
 vpi = { version = "0.3.2", path = "vpi" }
 vpi-shim = { version = "0.3.2", path = "vpi-shim" }
+vpi-sys = { version = "0.3.2", path = "vpi-sys" }

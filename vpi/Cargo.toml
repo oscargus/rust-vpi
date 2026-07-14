@@ -6,29 +6,17 @@ rust-version.workspace = true
 license.workspace = true
 authors.workspace = true
 repository.workspace = true
-keywords = [
-    "vpi",
-    "verilog",
-    "systemverilog",
-    "bindings",
-    "hardware-simulation",
-]
+keywords = ["vpi", "verilog", "systemverilog", "bindings", "hardware-simulation"]
 categories = ["simulation", "api-bindings"]
 description = "Safe and ergonomic Rust bindings to the Verilog and SystemVerilog VPI C API for writing VPI applications in Rust."
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
 
 [lib]
 name = "vpi"
 path = "src/lib.rs"
-
-[dependencies]
-bitflags.workspace = true
-num-bigint = { workspace = true, optional = true }
-num-derive.workspace = true
-num-traits.workspace = true
-vpi-sys.workspace = true
-
-[target.'cfg(any(target_os = "windows", target_os = "macos"))'.dependencies]
-vpi-shim = { workspace = true, optional = true }
 
 [features]
 default = []
@@ -36,6 +24,12 @@ dynamic = ["dep:vpi-shim"]
 bigint = ["dep:num-bigint"]
 sv = ["vpi-sys/sv"]
 
-[package.metadata.docs.rs]
-all-features = true
-rustdoc-args = ["--cfg", "docsrs"]
+[target.'cfg(any(target_os = "windows", target_os = "macos"))'.dependencies]
+vpi-shim = { workspace = true, optional = true }
+
+[dependencies]
+bitflags.workspace = true
+num-bigint = { workspace = true, optional = true }
+num-derive.workspace = true
+num-traits.workspace = true
+vpi-sys.workspace = true
