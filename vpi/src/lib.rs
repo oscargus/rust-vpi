@@ -4,9 +4,10 @@
 //!
 //! | Feature | Description |
 //! |---------|-------------|
+//! | `bigint` | Enables conversion between [`ScalarValue`] slices and arbitrary-precision integers using [`num_bigint::BigInt`] and [`num_bigint::BigUint`]. |
+//! | `cb_info` | Uses `vpi_get_cb_info` when removing callbacks. Enabled by default. |
 //! | `dynamic` | Enables runtime VPI symbol lookup via `vpi-shim` on Windows and macOS, allowing plugins to build without directly linking to a simulator library. |
 //! | `sv`     | Enables SystemVerilog VPI extensions (types, callbacks, and properties defined in IEEE 1800). |
-//! | `bigint` | Enables conversion between [`ScalarValue`] slices and arbitrary-precision integers using [`num_bigint::BigInt`] and [`num_bigint::BigUint`]. |
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
 #[cfg(all(feature = "dynamic", any(target_os = "windows", target_os = "macos")))]

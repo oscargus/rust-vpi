@@ -19,7 +19,8 @@ name = "vpi"
 path = "src/lib.rs"
 
 [features]
-default = []
+default = ["cb_info"]
+cb_info = []
 dynamic = ["dep:vpi-shim"]
 bigint = ["dep:num-bigint"]
 sv = ["vpi-sys/sv"]

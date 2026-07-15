@@ -6,6 +6,7 @@ This crate wraps `vpi-sys` with a safer API surface.
 
 ## Features
 
+- `cb_info`: Enabled by default. Uses `vpi_get_cb_info` when removing callbacks.
 - `sv`: Enable SystemVerilog VPI extensions.
 - `bigint`: Enable conversions with `num-bigint`.
 - `dynamic`: On Windows/macOS, use runtime symbol lookup via `vpi-shim` so plugins can be built without directly linking simulator libraries.

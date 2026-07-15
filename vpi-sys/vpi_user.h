@@ -348,7 +348,7 @@ typedef PLI_UINT32 *vpiHandle;
 #define vpiTermIndex             30   /* Index of a primitive terminal */
 #define vpiStrength0             31   /* 0-strength of net or gate */
 #define vpiStrength1             32   /* 1-strength of net or gate */
-#define vpiPrimType              33   /* prmitive subtypes: */
+#define vpiPrimType              33   /* primitive subtypes: */
 #define vpiAndPrim                 1   /* and gate */
 #define vpiNandPrim                2   /* nand gate */
 #define vpiNorPrim                 3   /* nor gate */
@@ -499,7 +499,7 @@ typedef PLI_UINT32 *vpiHandle;
 #define vpiSysFuncSized            vpiSizedFunc
 
 #define vpiUserDefn              45   /*user defined system task/func(Boolean)*/
-#define vpiScheduled             46   /* object still scheduled (Bboolean) */
+#define vpiScheduled             46   /* object still scheduled (Boolean) */
 
 /*********************** properties added with 1364-2001 **********************/
 

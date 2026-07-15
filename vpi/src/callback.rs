@@ -1,5 +1,10 @@
 use crate::{value::decode_vpi_value, Handle, Time, Value, ValueType};
 use num_traits::FromPrimitive;
+#[cfg(not(feature = "cb_info"))]
+use std::{
+    collections::HashMap,
+    sync::{Mutex, OnceLock},
+};
 
 /// VPI callback reasons used when registering simulator callbacks.
 ///
@@ -234,6 +239,31 @@ struct CallbackState {
     value: Option<Box<vpi_sys::t_vpi_value>>,
 }
 
+#[cfg(not(feature = "cb_info"))]
+fn callback_state_registry() -> &'static Mutex<HashMap<usize, usize>> {
+    static REGISTRY: OnceLock<Mutex<HashMap<usize, usize>>> = OnceLock::new();
+    REGISTRY.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+#[cfg(not(feature = "cb_info"))]
+fn register_callback_state(handle: vpi_sys::vpiHandle, state_ptr: *mut CallbackState) {
+    if !handle.is_null() {
+        callback_state_registry()
+            .lock()
+            .expect("callback state registry poisoned")
+            .insert(handle as usize, state_ptr as usize);
+    }
+}
+
+#[cfg(not(feature = "cb_info"))]
+fn take_callback_state(handle: vpi_sys::vpiHandle) -> Option<*mut CallbackState> {
+    callback_state_registry()
+        .lock()
+        .expect("callback state registry poisoned")
+        .remove(&(handle as usize))
+        .map(|state_ptr| state_ptr as *mut CallbackState)
+}
+
 fn default_cb_time() -> vpi_sys::t_vpi_time {
     vpi_sys::t_vpi_time {
         type_: vpi_sys::vpiSimTime as i32,
@@ -294,6 +324,9 @@ fn register_with_state(
         unsafe {
             let _ = Box::from_raw(state_ptr);
         }
+    } else {
+        #[cfg(not(feature = "cb_info"))]
+        register_callback_state(handle, state_ptr);
     }
 
     Handle::from_raw(handle)
@@ -330,6 +363,9 @@ impl Handle {
             unsafe {
                 let _ = Box::from_raw(user_data);
             }
+        } else {
+            #[cfg(not(feature = "cb_info"))]
+            register_callback_state(handle, user_data.cast::<CallbackState>());
         }
 
         Handle::from_raw(handle)
@@ -438,6 +474,9 @@ where
         unsafe {
             let _ = Box::from_raw(user_data);
         }
+    } else {
+        #[cfg(not(feature = "cb_info"))]
+        register_callback_state(handle, user_data.cast::<CallbackState>());
     }
 
     Handle::from_raw(handle)
@@ -479,6 +518,7 @@ where
 /// Removes a previously registered callback.
 ///
 /// If `handle` is null, this is a no-op.
+#[cfg(feature = "cb_info")]
 pub fn remove_cb(handle: &Handle) {
     if !handle.is_null() {
         unsafe {
@@ -501,6 +541,25 @@ pub fn remove_cb(handle: &Handle) {
             if is_internal && !cb_data.user_data.is_null() {
                 let _ = Box::from_raw(cb_data.user_data.cast::<CallbackState>());
             }
+        }
+    }
+}
+
+/// Removes a previously registered callback.
+///
+/// This version does not call `vpi_get_cb_info` and instead uses the
+/// callback state captured at registration time.
+#[cfg(not(feature = "cb_info"))]
+pub fn remove_cb(handle: &Handle) {
+    if handle.is_null() {
+        return;
+    }
+
+    let state_ptr = take_callback_state(handle.as_raw());
+    unsafe {
+        vpi_sys::vpi_remove_cb(handle.as_raw());
+        if let Some(state_ptr) = state_ptr {
+            let _ = Box::from_raw(state_ptr);
         }
     }
 }
