@@ -124,7 +124,7 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - uses: obi1kenobi/cargo-semver-checks-action@6b69fcf40e9b5fb17adeb57e4b6ecd020649a239 # v2.9
         with:
-          package: vpi, vpi-sys
+          package: vpi, vpi-sys, vpi-shim
 
   msrv:
     name: Check Minimum Rust Version
@@ -139,4 +139,7 @@ jobs:
         run: cargo msrv verify
       - name: Check MSRV for vpi-sys
         working-directory: vpi-sys
+        run: cargo msrv verify
+      - name: Check MSRV for vpi-shim
+        working-directory: vpi-shim
         run: cargo msrv verify
