@@ -11,5 +11,9 @@ categories = ["external-ffi-bindings", "simulation"]
 description = "Runtime symbol shim for VPI plugins on platforms that require explicit symbol resolution."
 readme = "README.md"
 
+[features]
+default = []
+sv = ["vpi-sys/sv"]
+
 [dependencies]
 vpi-sys.workspace = true

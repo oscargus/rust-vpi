@@ -1,3 +1,4 @@
+use std::ffi::CString;
 use std::fmt::Display;
 
 use num_derive::{FromPrimitive, ToPrimitive};
@@ -188,8 +189,6 @@ pub enum ScalarValue {
     L = vpi_sys::vpiL,
     /// Don't-care state.
     DontCare = vpi_sys::vpiDontCare,
-    /// Leave the current value unchanged.
-    NoChange = vpi_sys::vpiNoChange,
 }
 
 impl Display for ScalarValue {
@@ -208,7 +207,6 @@ impl From<ScalarValue> for char {
             ScalarValue::H => 'H',
             ScalarValue::L => 'L',
             ScalarValue::DontCare => '-',
-            ScalarValue::NoChange => 'N',
         }
     }
 }
@@ -219,22 +217,25 @@ pub struct StrengthValue {
     /// Scalar logic state carried by the value.
     logic: ScalarValue,
     /// Drive strength applied when the logic resolves to `0`.
-    strength0: StrengthEncoding,
+    strength0: Strength,
     /// Drive strength applied when the logic resolves to `1`.
-    strength1: StrengthEncoding,
+    strength1: Strength,
 }
 
 impl Display for StrengthValue {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} ({}, {})", self.logic, self.strength0, self.strength1)
+        write!(
+            f,
+            "{} ({}0, {}1)",
+            self.logic, self.strength0, self.strength1
+        )
     }
 }
 
-impl From<vpi_sys::t_vpi_strengthval> for StrengthValue {
-    fn from(strength: vpi_sys::t_vpi_strengthval) -> Self {
-        let logic = ScalarValue::from_u32(strength.logic as u32).unwrap_or(ScalarValue::DontCare);
-        let strength0 = StrengthEncoding::from_bits_truncate(strength.s0 as u32);
-        let strength1 = StrengthEncoding::from_bits_truncate(strength.s1 as u32);
+impl StrengthValue {
+    /// Creates a scalar value with associated drive strengths.
+    #[must_use]
+    pub fn new(logic: ScalarValue, strength0: Strength, strength1: Strength) -> Self {
         Self {
             logic,
             strength0,
@@ -243,57 +244,262 @@ impl From<vpi_sys::t_vpi_strengthval> for StrengthValue {
     }
 }
 
-bitflags::bitflags! {
-    #[derive(Debug)]
-    /// Drive-strength and charge encoding flags.
-    pub struct StrengthEncoding: u32 {
-        /// Supply-strength drive.
-        const SupplyDrive = vpi_sys::vpiSupplyDrive;
-        /// Strong drive strength.
-        const StrongDrive = vpi_sys::vpiStrongDrive;
-        /// Pull drive strength.
-        const PullDrive = vpi_sys::vpiPullDrive;
-        /// Large charge strength.
-        const LargeCharge = vpi_sys::vpiLargeCharge;
-        /// Weak drive strength.
-        const WeakDrive = vpi_sys::vpiWeakDrive;
-        /// Medium charge strength.
-        const MediumCharge = vpi_sys::vpiMediumCharge;
-        /// Small charge strength.
-        const SmallCharge = vpi_sys::vpiSmallCharge;
-        /// High-impedance strength.
-        const HiZ = vpi_sys::vpiHiZ;
+impl From<vpi_sys::t_vpi_strengthval> for StrengthValue {
+    fn from(strength: vpi_sys::t_vpi_strengthval) -> Self {
+        let logic = ScalarValue::from_u32(strength.logic as u32).unwrap_or(ScalarValue::DontCare);
+        let strength0 = Strength::from_u32(strength.s0 as u32).unwrap_or(Strength::HiZ);
+        let strength1 = Strength::from_u32(strength.s1 as u32).unwrap_or(Strength::HiZ);
+        Self {
+            logic,
+            strength0,
+            strength1,
+        }
     }
 }
 
-impl Display for StrengthEncoding {
+#[repr(u32)]
+#[derive(FromPrimitive, ToPrimitive, Copy, Clone, Debug, PartialEq, Eq)]
+/// Drive-strength and charge encodings used by VPI.
+pub enum Strength {
+    /// Supply-strength drive.
+    SupplyDrive = vpi_sys::vpiSupplyDrive,
+    /// Strong drive strength.
+    StrongDrive = vpi_sys::vpiStrongDrive,
+    /// Pull drive strength.
+    PullDrive = vpi_sys::vpiPullDrive,
+    /// Large charge strength.
+    LargeCharge = vpi_sys::vpiLargeCharge,
+    /// Weak drive strength.
+    WeakDrive = vpi_sys::vpiWeakDrive,
+    /// Medium charge strength.
+    MediumCharge = vpi_sys::vpiMediumCharge,
+    /// Small charge strength.
+    SmallCharge = vpi_sys::vpiSmallCharge,
+    /// High-impedance strength.
+    HiZ = vpi_sys::vpiHiZ,
+}
+
+/// Delay mode used with `vpi_put_value`.
+#[repr(i32)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum PutValueDelay {
+    /// Apply immediately.
+    NoDelay = vpi_sys::vpiNoDelay as i32,
+    /// Apply using inertial delay semantics.
+    Inertial = vpi_sys::vpiInertialDelay as i32,
+    /// Apply using transport delay semantics.
+    Transport = vpi_sys::vpiTransportDelay as i32,
+    /// Apply using pure transport delay semantics.
+    PureTransport = vpi_sys::vpiPureTransportDelay as i32,
+}
+
+struct PutValuePayload {
+    /// Raw VPI value record passed to `vpi_put_value`.
+    raw: vpi_sys::t_vpi_value,
+    /// Backing storage for string-valued payloads referenced by `raw`.
+    _string: Option<CString>,
+    /// Backing storage for vector-valued payloads referenced by `raw`.
+    _vector: Option<Vec<vpi_sys::t_vpi_vecval>>,
+    /// Backing storage for time-valued payloads referenced by `raw`.
+    _time: Option<Box<vpi_sys::s_vpi_time>>,
+    /// Backing storage for strength-valued payloads referenced by `raw`.
+    _strength: Option<Box<vpi_sys::t_vpi_strengthval>>,
+}
+
+fn scalar_to_ab_bits(value: ScalarValue) -> (i32, i32) {
+    match value {
+        ScalarValue::Zero | ScalarValue::L => (0, 0),
+        ScalarValue::One | ScalarValue::H => (1, 0),
+        ScalarValue::Z => (0, 1),
+        ScalarValue::X | ScalarValue::DontCare => (1, 1),
+    }
+}
+
+fn scalar_vector_to_vecval(bits: &[ScalarValue]) -> Vec<vpi_sys::t_vpi_vecval> {
+    let word_count = bits.len().div_ceil(32);
+    let mut vecvals = vec![vpi_sys::t_vpi_vecval { aval: 0, bval: 0 }; word_count.max(1)];
+
+    for (bit_index, bit) in bits.iter().rev().enumerate() {
+        let word = bit_index / 32;
+        let pos = bit_index % 32;
+        let (a, b) = scalar_to_ab_bits(*bit);
+        vecvals[word].aval |= a << pos;
+        vecvals[word].bval |= b << pos;
+    }
+
+    vecvals
+}
+
+fn cstring_lossy_no_nul(s: &str) -> CString {
+    let bytes: Vec<u8> = s.bytes().filter(|b| *b != 0).collect();
+    CString::new(bytes).expect("string was sanitized to exclude interior NUL")
+}
+
+fn encode_value_for_put(value: &Value) -> PutValuePayload {
+    let mut payload = PutValuePayload {
+        raw: vpi_sys::t_vpi_value {
+            format: 0,
+            value: vpi_sys::t_vpi_value__bindgen_ty_1 { integer: 0 },
+        },
+        _string: None,
+        _vector: None,
+        _time: None,
+        _strength: None,
+    };
+
+    match value {
+        Value::BinStr(s) => {
+            let cstr = cstring_lossy_no_nul(s);
+            payload.raw.format = vpi_sys::vpiBinStrVal as i32;
+            payload.raw.value = vpi_sys::t_vpi_value__bindgen_ty_1 {
+                str_: cstr.as_ptr().cast_mut(),
+            };
+            payload._string = Some(cstr);
+        }
+        Value::OctStr(s) => {
+            let cstr = cstring_lossy_no_nul(s);
+            payload.raw.format = vpi_sys::vpiOctStrVal as i32;
+            payload.raw.value = vpi_sys::t_vpi_value__bindgen_ty_1 {
+                str_: cstr.as_ptr().cast_mut(),
+            };
+            payload._string = Some(cstr);
+        }
+        Value::HexStr(s) => {
+            let cstr = cstring_lossy_no_nul(s);
+            payload.raw.format = vpi_sys::vpiHexStrVal as i32;
+            payload.raw.value = vpi_sys::t_vpi_value__bindgen_ty_1 {
+                str_: cstr.as_ptr().cast_mut(),
+            };
+            payload._string = Some(cstr);
+        }
+        Value::DecStr(s) => {
+            let cstr = cstring_lossy_no_nul(s);
+            payload.raw.format = vpi_sys::vpiDecStrVal as i32;
+            payload.raw.value = vpi_sys::t_vpi_value__bindgen_ty_1 {
+                str_: cstr.as_ptr().cast_mut(),
+            };
+            payload._string = Some(cstr);
+        }
+        Value::Scalar(s) => {
+            payload.raw.format = vpi_sys::vpiScalarVal as i32;
+            payload.raw.value = vpi_sys::t_vpi_value__bindgen_ty_1 { scalar: *s as i32 };
+        }
+        Value::Int(v) => {
+            payload.raw.format = vpi_sys::vpiIntVal as i32;
+            payload.raw.value = vpi_sys::t_vpi_value__bindgen_ty_1 { integer: *v };
+        }
+        Value::Real(v) => {
+            payload.raw.format = vpi_sys::vpiRealVal as i32;
+            payload.raw.value = vpi_sys::t_vpi_value__bindgen_ty_1 { real: *v };
+        }
+        Value::String(s) => {
+            let cstr = cstring_lossy_no_nul(s);
+            payload.raw.format = vpi_sys::vpiStringVal as i32;
+            payload.raw.value = vpi_sys::t_vpi_value__bindgen_ty_1 {
+                str_: cstr.as_ptr().cast_mut(),
+            };
+            payload._string = Some(cstr);
+        }
+        Value::Vector(bits) => {
+            let mut vector = scalar_vector_to_vecval(bits);
+            payload.raw.format = vpi_sys::vpiVectorVal as i32;
+            payload.raw.value = vpi_sys::t_vpi_value__bindgen_ty_1 {
+                vector: vector.as_mut_ptr(),
+            };
+            payload._vector = Some(vector);
+        }
+        Value::Strength(s) => {
+            let mut strength = Box::new(vpi_sys::t_vpi_strengthval {
+                logic: s.logic as i32,
+                s0: s.strength0 as i32,
+                s1: s.strength1 as i32,
+            });
+            payload.raw.format = vpi_sys::vpiStrengthVal as i32;
+            payload.raw.value = vpi_sys::t_vpi_value__bindgen_ty_1 {
+                strength: strength.as_mut(),
+            };
+            payload._strength = Some(strength);
+        }
+        Value::Time(t) => {
+            let mut time = Box::new(vpi_sys::s_vpi_time::from(t));
+            payload.raw.format = vpi_sys::vpiTimeVal as i32;
+            payload.raw.value = vpi_sys::t_vpi_value__bindgen_ty_1 {
+                time: time.as_mut(),
+            };
+            payload._time = Some(time);
+        }
+        Value::ObjType(v) => {
+            payload.raw.format = vpi_sys::vpiObjTypeVal as i32;
+            payload.raw.value = vpi_sys::t_vpi_value__bindgen_ty_1 { integer: *v };
+        }
+        Value::Suppress => {
+            payload.raw.format = vpi_sys::vpiSuppressVal as i32;
+            payload.raw.value = vpi_sys::t_vpi_value__bindgen_ty_1 { integer: 0 };
+        }
+        Value::ShortInt(v) => {
+            payload.raw.format = vpi_sys::vpiShortIntVal as i32;
+            payload.raw.value = vpi_sys::t_vpi_value__bindgen_ty_1 {
+                integer: i32::from(*v),
+            };
+        }
+        Value::LongInt(v) => {
+            let cstr = cstring_lossy_no_nul(&v.to_string());
+            payload.raw.format = vpi_sys::vpiDecStrVal as i32;
+            payload.raw.value = vpi_sys::t_vpi_value__bindgen_ty_1 {
+                str_: cstr.as_ptr().cast_mut(),
+            };
+            payload._string = Some(cstr);
+        }
+        Value::ShortReal(v) => {
+            payload.raw.format = vpi_sys::vpiRealVal as i32;
+            payload.raw.value = vpi_sys::t_vpi_value__bindgen_ty_1 {
+                real: f64::from(*v),
+            };
+        }
+        Value::RawTwoState(bits) => {
+            let scalar_bits: Vec<ScalarValue> = bits
+                .iter()
+                .map(|bit| {
+                    if *bit {
+                        ScalarValue::One
+                    } else {
+                        ScalarValue::Zero
+                    }
+                })
+                .collect();
+            let mut vector = scalar_vector_to_vecval(&scalar_bits);
+            payload.raw.format = vpi_sys::vpiVectorVal as i32;
+            payload.raw.value = vpi_sys::t_vpi_value__bindgen_ty_1 {
+                vector: vector.as_mut_ptr(),
+            };
+            payload._vector = Some(vector);
+        }
+        Value::RawFourState(bits) => {
+            let mut vector = scalar_vector_to_vecval(bits);
+            payload.raw.format = vpi_sys::vpiVectorVal as i32;
+            payload.raw.value = vpi_sys::t_vpi_value__bindgen_ty_1 {
+                vector: vector.as_mut_ptr(),
+            };
+            payload._vector = Some(vector);
+        }
+    }
+
+    payload
+}
+
+impl Display for Strength {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut strengths = Vec::new();
-        if self.contains(StrengthEncoding::SupplyDrive) {
-            strengths.push("SupplyDrive");
-        }
-        if self.contains(StrengthEncoding::StrongDrive) {
-            strengths.push("StrongDrive");
-        }
-        if self.contains(StrengthEncoding::PullDrive) {
-            strengths.push("PullDrive");
-        }
-        if self.contains(StrengthEncoding::LargeCharge) {
-            strengths.push("LargeCharge");
-        }
-        if self.contains(StrengthEncoding::WeakDrive) {
-            strengths.push("WeakDrive");
-        }
-        if self.contains(StrengthEncoding::MediumCharge) {
-            strengths.push("MediumCharge");
-        }
-        if self.contains(StrengthEncoding::SmallCharge) {
-            strengths.push("SmallCharge");
-        }
-        if self.contains(StrengthEncoding::HiZ) {
-            strengths.push("HiZ");
-        }
-        write!(f, "{}", strengths.join(" | "))
+        let name = match self {
+            Strength::SupplyDrive => "supply",
+            Strength::StrongDrive => "strong",
+            Strength::PullDrive => "pull",
+            Strength::LargeCharge => "large",
+            Strength::WeakDrive => "weak",
+            Strength::MediumCharge => "medium",
+            Strength::SmallCharge => "small",
+            Strength::HiZ => "highz",
+        };
+        write!(f, "{name}")
     }
 }
 
@@ -323,10 +529,7 @@ bitflags::bitflags! {
 /// * `vec` - Array of `vpi_vecval` structures containing the encoded bits
 /// * `size` - Number of bits to extract
 #[must_use]
-pub fn vector_value_to_scalar_vector(
-    vec: &[vpi_sys::t_vpi_vecval],
-    size: usize,
-) -> Vec<ScalarValue> {
+fn vector_value_to_scalar_vector(vec: &[vpi_sys::t_vpi_vecval], size: usize) -> Vec<ScalarValue> {
     let mut result = Vec::with_capacity(size);
 
     for bit_index in 0..size {
@@ -435,7 +638,7 @@ pub(crate) fn decode_vpi_value(
 ///
 /// Returns `None` if any element is not a definite binary value
 /// ([`ScalarValue::Zero`] or [`ScalarValue::One`]).
-/// Any `X`, `Z`, `H`, `L`, `DontCare`, or `NoChange` bit causes `None` to be returned.
+/// Any `X`, `Z`, `H`, `L`, or `DontCare` bit causes `None` to be returned.
 #[cfg(feature = "bigint")]
 #[must_use]
 pub fn scalar_vector_to_biguint(bits: &[ScalarValue]) -> Option<num_bigint::BigUint> {
@@ -474,7 +677,7 @@ pub fn uint64_to_scalar_vector(value: u64, bits: usize) -> Vec<ScalarValue> {
 ///
 /// Returns `None` if the slice contains more than 64 bits or if any element is
 /// not a definite binary value ([`ScalarValue::Zero`] or [`ScalarValue::One`]).
-/// Any `X`, `Z`, `H`, `L`, `DontCare`, or `NoChange` bit causes `None` to be
+/// Any `X`, `Z`, `H`, `L`, or `DontCare` bit causes `None` to be
 /// returned.
 #[must_use]
 pub fn scalar_vector_to_uint64(bits: &[ScalarValue]) -> Option<u64> {
@@ -491,6 +694,36 @@ pub fn scalar_vector_to_uint64(bits: &[ScalarValue]) -> Option<u64> {
         }
     }
     Some(result)
+}
+
+/// Convert a scalar vector into a compact string representation.
+///
+/// Each scalar is mapped to its Verilog-style character (`0`, `1`, `X`, `Z`,
+/// `H`, `L`, `-`) in order (MSB at index 0).
+#[must_use]
+pub fn scalar_vector_to_string(bits: &[ScalarValue]) -> String {
+    bits.iter().copied().map(char::from).collect()
+}
+
+/// Convert a scalar string into a vector of scalar values.
+///
+/// Accepts Verilog-style scalar symbols: `0`, `1`, `X`, `Z`, `H`, `L`, `-`,
+/// (also lowercase `x`, `z`, `h`, `l`). Returns `None` if any
+/// character is not a supported scalar symbol.
+#[must_use]
+pub fn string_to_scalar_vector(bits: &str) -> Option<Vec<ScalarValue>> {
+    bits.chars()
+        .map(|c| match c {
+            '0' => Some(ScalarValue::Zero),
+            '1' => Some(ScalarValue::One),
+            'X' | 'x' => Some(ScalarValue::X),
+            'Z' | 'z' => Some(ScalarValue::Z),
+            'H' | 'h' => Some(ScalarValue::H),
+            'L' | 'l' => Some(ScalarValue::L),
+            '-' => Some(ScalarValue::DontCare),
+            _ => None,
+        })
+        .collect()
 }
 
 /// Convert a [`num_bigint::BigUint`] to a binary-encoded [`Vec<ScalarValue>`] (MSB at index 0).
@@ -527,7 +760,7 @@ pub fn int64_to_scalar_vector(value: i64, bits: usize) -> Vec<ScalarValue> {
 ///
 /// Returns `None` if the slice is empty, contains more than 64 bits, or if any
 /// element is not a definite binary value ([`ScalarValue::Zero`] or
-/// [`ScalarValue::One`]). Any `X`, `Z`, `H`, `L`, `DontCare`, or `NoChange`
+/// [`ScalarValue::One`]). Any `X`, `Z`, `H`, `L`, or `DontCare`
 /// bit causes `None` to be returned.
 #[must_use]
 pub fn scalar_vector_to_int64(bits: &[ScalarValue]) -> Option<i64> {
@@ -566,7 +799,7 @@ pub fn bigint_to_scalar_vector(value: &num_bigint::BigInt, bits: usize) -> Vec<S
 ///
 /// Returns `None` if the slice is empty or if any element is not a definite
 /// binary value ([`ScalarValue::Zero`] or [`ScalarValue::One`]). Any `X`, `Z`,
-/// `H`, `L`, `DontCare`, or `NoChange` bit causes `None` to be returned.
+/// `H`, `L`, or `DontCare` bit causes `None` to be returned.
 #[cfg(feature = "bigint")]
 #[must_use]
 pub fn scalar_vector_to_bigint(bits: &[ScalarValue]) -> Option<num_bigint::BigInt> {
@@ -584,6 +817,60 @@ pub fn scalar_vector_to_bigint(bits: &[ScalarValue]) -> Option<num_bigint::BigIn
 }
 
 impl Handle {
+    /// Writes a value to this handle using `vpi_put_value` with no delay.
+    ///
+    /// Returns a null handle when this handle is null. Otherwise returns the
+    /// event handle returned by the simulator (which may also be null).
+    #[must_use]
+    pub fn put_value(&self, value: &Value) -> Handle {
+        self.put_value_scheduled(value, None, PutValueDelay::NoDelay, &PutValueFlags::empty())
+    }
+
+    /// Writes a value to this handle using `vpi_put_value` with optional scheduling.
+    ///
+    /// `time` is ignored when `delay` is [`PutValueDelay::NoDelay`].
+    /// Returns a null handle when this handle is null. Otherwise returns the
+    /// event handle returned by the simulator (which may also be null).
+    #[must_use]
+    pub fn put_value_scheduled(
+        &self,
+        value: &Value,
+        time: Option<&Time>,
+        delay: PutValueDelay,
+        flags: &PutValueFlags,
+    ) -> Handle {
+        if self.is_null() {
+            return Handle::null();
+        }
+
+        let mut payload = encode_value_for_put(value);
+
+        let mut raw_time_storage;
+        let raw_time_ptr = if matches!(delay, PutValueDelay::NoDelay) {
+            std::ptr::null_mut()
+        } else {
+            raw_time_storage = vpi_sys::s_vpi_time::from(&time.cloned().unwrap_or(Time::Sim(0)));
+            &raw mut raw_time_storage
+        };
+
+        let raw_flags = (delay as i32) | (flags.bits() as i32);
+
+        let event = unsafe {
+            vpi_sys::vpi_put_value(self.as_raw(), &raw mut payload.raw, raw_time_ptr, raw_flags)
+        };
+
+        Handle::from_raw(event)
+    }
+
+    /// Writes an integer value to this handle using `vpi_put_value` with no delay.
+    ///
+    /// Returns a null handle when this handle is null. Otherwise returns the
+    /// event handle returned by the simulator (which may also be null).
+    #[must_use]
+    pub fn put_int_value(&self, value: i32) -> Handle {
+        self.put_value(&Value::Int(value))
+    }
+
     /// Reads a value from this handle in the requested format.
     ///
     /// If `format` is [`ValueType::ObjType`], the simulator may override the
@@ -864,13 +1151,32 @@ impl Handle {
     }
 }
 
+#[cfg(all(
+    test,
+    any(
+        not(any(target_os = "windows", target_os = "macos")),
+        not(feature = "dynamic")
+    )
+))]
+#[unsafe(no_mangle)]
+unsafe extern "C" fn vpi_put_value(
+    _object: vpi_sys::vpiHandle,
+    _value_p: vpi_sys::p_vpi_value,
+    _time_p: vpi_sys::p_vpi_time,
+    _flags: vpi_sys::PLI_INT32,
+) -> vpi_sys::vpiHandle {
+    std::ptr::null_mut()
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
-        int64_to_scalar_vector, scalar_vector_to_int64, scalar_vector_to_uint64,
-        uint64_to_scalar_vector, vector_value_to_scalar_vector, ScalarValue, StrengthEncoding,
-        Value, ValueType,
+        cstring_lossy_no_nul, encode_value_for_put, int64_to_scalar_vector, scalar_to_ab_bits,
+        scalar_vector_to_int64, scalar_vector_to_string, scalar_vector_to_uint64,
+        scalar_vector_to_vecval, string_to_scalar_vector, uint64_to_scalar_vector,
+        vector_value_to_scalar_vector, PutValueDelay, PutValueFlags, ScalarValue, Value, ValueType,
     };
+    use crate::{Handle, Strength, StrengthValue, Time};
 
     fn scalar_vec_to_string(values: Vec<ScalarValue>) -> String {
         values.into_iter().map(|value| value.to_string()).collect()
@@ -895,6 +1201,132 @@ mod tests {
     }
 
     #[test]
+    fn scalar_vector_to_vecval_round_trips_common_states() {
+        let input = vec![
+            ScalarValue::X,
+            ScalarValue::Z,
+            ScalarValue::One,
+            ScalarValue::Zero,
+        ];
+
+        let encoded = scalar_vector_to_vecval(&input);
+        let decoded = vector_value_to_scalar_vector(&encoded, input.len());
+
+        assert_eq!(scalar_vec_to_string(decoded), "XZ10");
+    }
+
+    #[test]
+    fn scalar_to_ab_bits_maps_four_state_logic() {
+        assert_eq!(scalar_to_ab_bits(ScalarValue::Zero), (0, 0));
+        assert_eq!(scalar_to_ab_bits(ScalarValue::One), (1, 0));
+        assert_eq!(scalar_to_ab_bits(ScalarValue::Z), (0, 1));
+        assert_eq!(scalar_to_ab_bits(ScalarValue::X), (1, 1));
+    }
+
+    #[test]
+    fn cstring_lossy_no_nul_strips_interior_nuls() {
+        let cstr = cstring_lossy_no_nul("ab\0cd");
+        assert_eq!(cstr.to_bytes(), b"abcd");
+    }
+
+    #[test]
+    fn put_value_delay_matches_vpi_constants() {
+        assert_eq!(PutValueDelay::NoDelay as i32, vpi_sys::vpiNoDelay as i32);
+        assert_eq!(
+            PutValueDelay::Inertial as i32,
+            vpi_sys::vpiInertialDelay as i32
+        );
+        assert_eq!(
+            PutValueDelay::Transport as i32,
+            vpi_sys::vpiTransportDelay as i32
+        );
+        assert_eq!(
+            PutValueDelay::PureTransport as i32,
+            vpi_sys::vpiPureTransportDelay as i32
+        );
+    }
+
+    #[test]
+    fn put_value_flags_empty_is_zero() {
+        assert_eq!(PutValueFlags::empty().bits(), 0);
+    }
+
+    #[test]
+    fn put_value_on_null_handle_returns_null() {
+        let h = Handle::null();
+        let event = h.put_value(&Value::Int(7));
+        assert!(event.is_null());
+    }
+
+    #[test]
+    fn put_value_scheduled_on_null_handle_returns_null() {
+        let h = Handle::null();
+        let event = h.put_value_scheduled(
+            &Value::Int(7),
+            Some(&Time::Sim(5)),
+            PutValueDelay::Inertial,
+            &PutValueFlags::ReturnEvent,
+        );
+        assert!(event.is_null());
+    }
+
+    #[test]
+    fn put_int_value_on_null_handle_returns_null() {
+        let h = Handle::null();
+        let event = h.put_int_value(7);
+        assert!(event.is_null());
+    }
+
+    #[test]
+    fn encode_value_for_put_string_uses_string_format_and_storage() {
+        let payload = encode_value_for_put(&Value::String("hello".to_string()));
+        assert_eq!(payload.raw.format, vpi_sys::vpiStringVal as i32);
+        assert!(payload._string.is_some());
+        assert_eq!(
+            payload
+                ._string
+                .as_ref()
+                .expect("string storage should exist")
+                .to_bytes(),
+            b"hello"
+        );
+    }
+
+    #[test]
+    fn encode_value_for_put_vector_allocates_vecval_storage() {
+        let payload = encode_value_for_put(&Value::Vector(vec![
+            ScalarValue::One,
+            ScalarValue::Zero,
+            ScalarValue::X,
+            ScalarValue::Z,
+        ]));
+        assert_eq!(payload.raw.format, vpi_sys::vpiVectorVal as i32);
+        assert!(payload._vector.is_some());
+        assert!(!payload._vector.as_ref().expect("vector storage").is_empty());
+    }
+
+    #[test]
+    fn encode_value_for_put_longint_uses_decimal_string_path() {
+        let payload = encode_value_for_put(&Value::LongInt(-42));
+        assert_eq!(payload.raw.format, vpi_sys::vpiDecStrVal as i32);
+        assert_eq!(
+            payload
+                ._string
+                .as_ref()
+                .expect("longint should use string backing")
+                .to_bytes(),
+            b"-42"
+        );
+    }
+
+    #[test]
+    fn encode_value_for_put_time_uses_time_format_and_storage() {
+        let payload = encode_value_for_put(&Value::Time(Time::Sim(10)));
+        assert_eq!(payload.raw.format, vpi_sys::vpiTimeVal as i32);
+        assert!(payload._time.is_some());
+    }
+
+    #[test]
     fn raw_two_state_display_renders_binary_string() {
         let value = Value::RawTwoState(vec![true, false, true, true, false]);
 
@@ -909,17 +1341,69 @@ mod tests {
             ScalarValue::X,
             ScalarValue::Z,
             ScalarValue::DontCare,
-            ScalarValue::NoChange,
         ]);
 
-        assert_eq!(value.to_string(), "01XZ-N");
+        assert_eq!(value.to_string(), "01XZ-");
     }
 
     #[test]
-    fn strength_encoding_display_joins_active_flags_in_order() {
-        let strength = StrengthEncoding::StrongDrive | StrengthEncoding::HiZ;
+    fn strength_value_display_renders_logic_and_drive_strengths() {
+        let value = StrengthValue::new(ScalarValue::One, Strength::StrongDrive, Strength::HiZ);
 
-        assert_eq!(strength.to_string(), "StrongDrive | HiZ");
+        assert_eq!(value.to_string(), "1 (strong0, highz1)");
+    }
+
+    #[test]
+    fn scalar_vector_to_string_renders_expected_symbols() {
+        let values = vec![
+            ScalarValue::Zero,
+            ScalarValue::One,
+            ScalarValue::X,
+            ScalarValue::Z,
+            ScalarValue::DontCare,
+        ];
+
+        assert_eq!(scalar_vector_to_string(&values), "01XZ-");
+    }
+
+    #[test]
+    fn string_to_scalar_vector_parses_supported_symbols() {
+        let parsed = string_to_scalar_vector("01XZHL-").expect("valid scalar symbols");
+        assert_eq!(
+            parsed,
+            vec![
+                ScalarValue::Zero,
+                ScalarValue::One,
+                ScalarValue::X,
+                ScalarValue::Z,
+                ScalarValue::H,
+                ScalarValue::L,
+                ScalarValue::DontCare,
+            ]
+        );
+    }
+
+    #[test]
+    fn string_to_scalar_vector_accepts_lowercase_letters() {
+        let parsed = string_to_scalar_vector("xzhl".replace(' ', "").as_str())
+            .expect("valid lowercase symbols");
+        assert_eq!(
+            parsed,
+            vec![
+                ScalarValue::X,
+                ScalarValue::Z,
+                ScalarValue::H,
+                ScalarValue::L,
+            ]
+        );
+    }
+
+    #[test]
+    fn string_to_scalar_vector_rejects_invalid_symbols() {
+        assert_eq!(string_to_scalar_vector("012"), None);
+        assert_eq!(string_to_scalar_vector("A"), None);
+        assert_eq!(string_to_scalar_vector("N"), None);
+        assert_eq!(string_to_scalar_vector("n"), None);
     }
 
     #[test]

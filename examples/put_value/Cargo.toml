@@ -1,0 +1,15 @@
+[package]
+name = "put_value"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+repository.workspace = true
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+test = false
+doctest = false
+
+[dependencies]
+vpi = { workspace = true, features = ["dynamic"] }

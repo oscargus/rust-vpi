@@ -766,6 +766,28 @@ impl OpType {
 }
 
 impl Handle {
+    /// Reads a numeric property using `vpi_get64` and returns it as `i64`.
+    ///
+    /// Returns `None` for null handles.
+    #[must_use]
+    pub fn get_i64(&self, property: Property) -> Option<i64> {
+        if self.is_null() {
+            return None;
+        }
+
+        let value = unsafe { vpi_sys::vpi_get64(property as PLI_INT32, self.as_raw()) };
+        Some(value)
+    }
+
+    /// Reads a numeric property using `vpi_get64` and returns it as `u64`.
+    ///
+    /// Returns `None` for null handles or negative raw values.
+    #[must_use]
+    pub fn get_u64(&self, property: Property) -> Option<u64> {
+        let value = self.get_i64(property)?;
+        u64::try_from(value).ok()
+    }
+
     /// Reads a numeric property and returns it as `u32` when supported.
     ///
     /// Returns `None` for null handles or unsupported properties.

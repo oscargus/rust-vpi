@@ -1,6 +1,6 @@
 use crate::{value::decode_vpi_value, Handle, Time, Value, ValueType};
 use num_traits::FromPrimitive;
-#[cfg(not(feature = "cb_info"))]
+#[cfg(any(not(feature = "cb_info"), feature = "sv"))]
 use std::{
     collections::HashMap,
     sync::{Mutex, OnceLock},
@@ -132,6 +132,9 @@ pub enum CbReason {
     #[cfg(feature = "sv")]
     /// Assertion system off.
     AssertionSysOff = vpi_sys::cbAssertionSysOff,
+    #[cfg(feature = "sv")]
+    /// Assertion system kill.
+    AssertionSysKill = vpi_sys::cbAssertionSysKill,
     #[cfg(feature = "sv")]
     /// Assertion system end.
     AssertionSysEnd = vpi_sys::cbAssertionSysEnd,
@@ -285,6 +288,176 @@ fn cb_value_with_format(value_type: ValueType) -> vpi_sys::t_vpi_value {
         format: value_type as i32,
         value: vpi_sys::t_vpi_value__bindgen_ty_1 { integer: 0 },
     }
+}
+
+#[cfg(feature = "sv")]
+fn assertion_callback_state_registry() -> &'static Mutex<HashMap<usize, usize>> {
+    static REGISTRY: OnceLock<Mutex<HashMap<usize, usize>>> = OnceLock::new();
+    REGISTRY.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+#[cfg(feature = "sv")]
+fn register_assertion_callback_state(
+    handle: vpi_sys::vpiHandle,
+    state_ptr: *mut AssertionCallbackState,
+) {
+    if !handle.is_null() {
+        assertion_callback_state_registry()
+            .lock()
+            .expect("assertion callback state registry poisoned")
+            .insert(handle as usize, state_ptr as usize);
+    }
+}
+
+#[cfg(feature = "sv")]
+fn take_assertion_callback_state(
+    handle: vpi_sys::vpiHandle,
+) -> Option<*mut AssertionCallbackState> {
+    assertion_callback_state_registry()
+        .lock()
+        .expect("assertion callback state registry poisoned")
+        .remove(&(handle as usize))
+        .map(|state_ptr| state_ptr as *mut AssertionCallbackState)
+}
+
+#[cfg(feature = "sv")]
+struct AssertionCallbackState {
+    callback: Box<dyn Fn(&AssertionCbData)>,
+}
+
+/// Safe callback data passed to SystemVerilog assertion callbacks.
+#[cfg(feature = "sv")]
+#[derive(Debug)]
+pub struct AssertionCbData {
+    /// Callback reason.
+    pub reason: CbReason,
+    /// Assertion object associated with the callback.
+    pub assertion: Handle,
+    /// Optional callback time payload.
+    pub time: Option<Time>,
+    /// Optional assertion-attempt metadata from `p_vpi_attempt_info`.
+    pub attempt_info: Option<AssertionAttemptInfo>,
+}
+
+/// Decoded step-transition details for assertion step callbacks.
+#[cfg(feature = "sv")]
+#[derive(Debug)]
+pub struct AssertionStepInfo {
+    /// Matched expression handles provided by the simulator.
+    pub matched_exprs: Vec<Handle>,
+    /// Source state ID for the transition.
+    pub state_from: i32,
+    /// Destination state ID for the transition.
+    pub state_to: i32,
+}
+
+/// Decoded union payload from `t_vpi_attempt_info.detail`.
+#[cfg(feature = "sv")]
+#[derive(Debug)]
+pub enum AssertionAttemptDetail {
+    /// Failure expression handle.
+    FailExpr(Handle),
+    /// Step-transition payload.
+    Step(AssertionStepInfo),
+}
+
+/// Safe wrapper for `t_vpi_attempt_info`.
+#[cfg(feature = "sv")]
+#[derive(Debug)]
+pub struct AssertionAttemptInfo {
+    /// Union payload interpreted according to callback reason.
+    pub detail: AssertionAttemptDetail,
+    /// Attempt start time, when decodable.
+    pub attempt_start_time: Option<Time>,
+}
+
+#[cfg(feature = "sv")]
+fn decode_assertion_attempt_info(
+    reason: CbReason,
+    info: vpi_sys::p_vpi_attempt_info,
+) -> Option<AssertionAttemptInfo> {
+    if info.is_null() {
+        return None;
+    }
+
+    let info_ref = unsafe { &*info };
+    let attempt_start_time = time_from_cb_data(info_ref.attemptStartTime);
+
+    let detail = match reason {
+        CbReason::AssertionStepSuccess | CbReason::AssertionStepFailure => {
+            let step_ptr = unsafe { info_ref.detail.step };
+            if step_ptr.is_null() {
+                return None;
+            }
+
+            let step_ref = unsafe { &*step_ptr };
+            let count = if step_ref.matched_expression_count <= 0 {
+                0
+            } else {
+                usize::try_from(step_ref.matched_expression_count).ok()?
+            };
+
+            let matched_exprs = if count == 0 || step_ref.matched_exprs.is_null() {
+                Vec::new()
+            } else {
+                let slice = unsafe { std::slice::from_raw_parts(step_ref.matched_exprs, count) };
+                slice.iter().copied().map(Handle::from_raw).collect()
+            };
+
+            AssertionAttemptDetail::Step(AssertionStepInfo {
+                matched_exprs,
+                state_from: step_ref.stateFrom,
+                state_to: step_ref.stateTo,
+            })
+        }
+        _ => {
+            let fail_expr = unsafe { info_ref.detail.failExpr };
+            AssertionAttemptDetail::FailExpr(Handle::from_raw(fail_expr))
+        }
+    };
+
+    Some(AssertionAttemptInfo {
+        detail,
+        attempt_start_time,
+    })
+}
+
+#[cfg(feature = "sv")]
+unsafe extern "C" fn assertion_trampoline(
+    reason: vpi_sys::PLI_INT32,
+    cb_time: vpi_sys::p_vpi_time,
+    assertion: vpi_sys::vpiHandle,
+    info: vpi_sys::p_vpi_attempt_info,
+    user_data: *mut vpi_sys::PLI_BYTE8,
+) -> vpi_sys::PLI_INT32 {
+    if user_data.is_null() {
+        return 0;
+    }
+
+    let state_ptr = user_data.cast::<AssertionCallbackState>();
+    if state_ptr.is_null() {
+        return 0;
+    }
+
+    let Some(reason) = CbReason::from_u32(reason as u32) else {
+        return 0;
+    };
+
+    let mut data = AssertionCbData {
+        reason,
+        assertion: Handle::from_raw(assertion),
+        time: if cb_time.is_null() {
+            None
+        } else {
+            time_from_cb_data(unsafe { *cb_time })
+        },
+        attempt_info: decode_assertion_attempt_info(reason, info),
+    };
+
+    let state = unsafe { &*state_ptr };
+    (state.callback)(&data);
+    data.assertion.clear();
+    0
 }
 
 fn register_with_state(
@@ -515,6 +688,56 @@ where
     register_with_state(reason, std::ptr::null_mut(), state)
 }
 
+/// Registers a SystemVerilog assertion callback.
+///
+/// Available only with the `sv` feature.
+#[cfg(feature = "sv")]
+pub fn register_assertion_cb<F>(assertion: &Handle, reason: CbReason, callback: F) -> Handle
+where
+    F: Fn(&AssertionCbData) + 'static,
+{
+    let state_ptr = Box::into_raw(Box::new(AssertionCallbackState {
+        callback: Box::new(callback),
+    }));
+
+    let handle = unsafe {
+        vpi_sys::vpi_register_assertion_cb(
+            assertion.as_raw(),
+            reason as i32,
+            Some(assertion_trampoline),
+            state_ptr.cast::<vpi_sys::PLI_BYTE8>(),
+        )
+    };
+
+    if handle.is_null() {
+        unsafe {
+            let _ = Box::from_raw(state_ptr);
+        }
+    } else {
+        register_assertion_callback_state(handle, state_ptr);
+    }
+
+    Handle::from_raw(handle)
+}
+
+/// Removes a previously registered SystemVerilog assertion callback.
+///
+/// Available only with the `sv` feature.
+#[cfg(feature = "sv")]
+pub fn remove_assertion_cb(handle: &Handle) {
+    if handle.is_null() {
+        return;
+    }
+
+    let state_ptr = take_assertion_callback_state(handle.as_raw());
+    unsafe {
+        vpi_sys::vpi_remove_cb(handle.as_raw());
+        if let Some(state_ptr) = state_ptr {
+            let _ = Box::from_raw(state_ptr);
+        }
+    }
+}
+
 /// Removes a previously registered callback.
 ///
 /// If `handle` is null, this is a no-op.
@@ -536,8 +759,7 @@ pub fn remove_cb(handle: &Handle) {
             let trampoline_ptr = trampoline as unsafe extern "C" fn(*mut vpi_sys::t_cb_data) -> i32;
             let is_internal = cb_data
                 .cb_rtn
-                .map(|cb| (cb as usize) == (trampoline_ptr as usize))
-                .unwrap_or(false);
+                .is_some_and(|cb| (cb as usize) == (trampoline_ptr as usize));
             if is_internal && !cb_data.user_data.is_null() {
                 let _ = Box::from_raw(cb_data.user_data.cast::<CallbackState>());
             }
