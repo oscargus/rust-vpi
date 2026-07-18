@@ -1,5 +1,8 @@
 # vpi-shim
 
+[![crates.io](https://img.shields.io/crates/v/vpi-shim.svg)](https://crates.io/crates/vpi-shim)
+[![docs.rs](https://docs.rs/vpi-shim/badge.svg)](https://docs.rs/vpi-shim)
+
 Runtime symbol shim for VPI plugins on platforms that require explicit symbol resolution.
 
 This crate exports VPI entry points and resolves simulator symbols dynamically at runtime.

@@ -9,6 +9,7 @@ repository.workspace = true
 keywords = ["vpi", "verilog", "systemverilog", "ffi", "simulation"]
 categories = ["external-ffi-bindings", "simulation"]
 description = "Runtime symbol shim for VPI plugins on platforms that require explicit symbol resolution."
+readme = "README.md"
 
 [dependencies]
 vpi-sys.workspace = true

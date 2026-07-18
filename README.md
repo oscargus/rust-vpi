@@ -1,5 +1,11 @@
 # vpi and vpi-sys
 
+[![CI](https://github.com/oscargus/rust-vpi/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/oscargus/rust-vpi/actions/workflows/ci.yml)
+[![crates.io vpi](https://img.shields.io/crates/v/vpi.svg)](https://crates.io/crates/vpi)
+[![docs.rs vpi](https://docs.rs/vpi/badge.svg)](https://docs.rs/vpi)
+[![MSRV vpi](https://img.shields.io/badge/MSRV-1.88-blue)](https://github.com/oscargus/rust-vpi)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 vpi is a Rust crate for easily working with the Verilog Procedural Interface (VPI) through Rust abstractions. There are several similar libraries, but the unique features of vpi are:
 
 - **Rust abstractions**: The user should only have to deal with Rust types and it should be easy to access things in a (relatively) safe way.

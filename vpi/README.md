@@ -1,5 +1,8 @@
 # vpi
 
+[![crates.io](https://img.shields.io/crates/v/vpi.svg)](https://crates.io/crates/vpi)
+[![docs.rs](https://docs.rs/vpi/badge.svg)](https://docs.rs/vpi)
+
 Safe and ergonomic Rust bindings for writing Verilog/SystemVerilog VPI plugins.
 
 This crate wraps `vpi-sys` with a safer API surface.

@@ -1,0 +1,36 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+    - id: check-yaml
+    - id: end-of-file-fixer
+    - id: trailing-whitespace
+    - id: check-merge-conflict
+    - id: mixed-line-ending
+  - repo: https://github.com/codespell-project/codespell
+    rev: v2.4.2
+    hooks:
+    - id: codespell
+      args:
+      - --ignore-words-list=InTerm,interm,indx,Inout,inout,caf
+  - repo: https://github.com/DevinR528/cargo-sort
+    rev: v2.1.3
+    hooks:
+      - id: cargo-sort
+        args: ["-w"]
+  - repo: https://github.com/doublify/pre-commit-rust
+    rev: v1.0
+    hooks:
+    - id: fmt
+    - id: cargo-check
+    - id: clippy
+      verbose: True
+      args: ["--no-deps",
+             "--all-targets",
+             "--",
+             "-A", "clippy::all",
+             "-W", "clippy::clone_on_copy",
+             "-W", "clippy::needless_borrow",
+             "-W", "clippy::correctness",
+             "-W", "clippy::suspicious",
+             ]
