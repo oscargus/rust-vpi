@@ -211,7 +211,7 @@ impl From<ScalarValue> for char {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 /// Scalar logic value plus drive strengths.
 pub struct StrengthValue {
     /// Scalar logic state carried by the value.

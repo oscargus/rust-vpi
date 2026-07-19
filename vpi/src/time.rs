@@ -3,7 +3,7 @@ use std::fmt::Display;
 use crate::Handle;
 
 /// Time value representation used by VPI APIs.
-#[derive(Debug, Clone, PartialEq, Copy)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Time {
     /// Simulator time encoded as a 64-bit tick value.
     Sim(u64),
