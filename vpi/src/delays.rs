@@ -34,7 +34,7 @@ impl DelayTimeType {
 }
 
 /// Safe representation of `s_vpi_delay`.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct DelayData {
     /// Delay values used by `vpi_get_delays`/`vpi_put_delays`.
     pub delays: Vec<Time>,
@@ -204,8 +204,21 @@ impl Handle {
 
 #[cfg(test)]
 mod tests {
-    use super::{DelayData, DelayTimeType};
+    use super::{decode_time, DelayData, DelayTimeType};
     use crate::Time;
+
+    #[test]
+    fn with_time_type_preserves_values_and_initial_flags() {
+        let delays = vec![Time::ScaledReal(1.25), Time::ScaledReal(2.5)];
+
+        let data = DelayData::with_time_type(delays.clone(), DelayTimeType::ScaledReal);
+
+        assert_eq!(data.delays, delays);
+        assert_eq!(data.time_type, DelayTimeType::ScaledReal);
+        assert!(!data.mtm);
+        assert!(!data.append);
+        assert!(!data.pulsere);
+    }
 
     #[test]
     fn infer_time_type_from_sim_delays() {
@@ -234,6 +247,16 @@ mod tests {
 
     #[test]
     fn raw_time_type_round_trip() {
+        assert_eq!(DelayTimeType::Sim.as_raw(), vpi_sys::vpiSimTime as i32);
+        assert_eq!(
+            DelayTimeType::ScaledReal.as_raw(),
+            vpi_sys::vpiScaledRealTime as i32
+        );
+        assert_eq!(
+            DelayTimeType::Suppress.as_raw(),
+            vpi_sys::vpiSuppressTime as i32
+        );
+
         assert!(matches!(
             DelayTimeType::from_raw(vpi_sys::vpiSimTime as i32),
             Some(DelayTimeType::Sim)
@@ -247,5 +270,44 @@ mod tests {
             Some(DelayTimeType::Suppress)
         ));
         assert!(DelayTimeType::from_raw(-1).is_none());
+    }
+
+    #[test]
+    fn decode_time_supports_all_known_variants() {
+        let sim = vpi_sys::s_vpi_time {
+            type_: vpi_sys::vpiSimTime as i32,
+            high: 0x1234_5678,
+            low: 0x9abc_def0,
+            real: 0.0,
+        };
+        assert_eq!(decode_time(sim), Some(Time::Sim(0x1234_5678_9abc_def0)));
+
+        let scaled_real = vpi_sys::s_vpi_time {
+            type_: vpi_sys::vpiScaledRealTime as i32,
+            high: 0,
+            low: 0,
+            real: 3.5,
+        };
+        assert_eq!(decode_time(scaled_real), Some(Time::ScaledReal(3.5)));
+
+        let suppress = vpi_sys::s_vpi_time {
+            type_: vpi_sys::vpiSuppressTime as i32,
+            high: 99,
+            low: 100,
+            real: 7.0,
+        };
+        assert_eq!(decode_time(suppress), Some(Time::Suppress));
+    }
+
+    #[test]
+    fn decode_time_rejects_unknown_type() {
+        let invalid = vpi_sys::s_vpi_time {
+            type_: -1,
+            high: 0,
+            low: 0,
+            real: 0.0,
+        };
+
+        assert_eq!(decode_time(invalid), None);
     }
 }

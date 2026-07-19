@@ -38,11 +38,32 @@ fn walk_hierarchy(handle: &Handle, indent: usize) {
             .unwrap_or("<unnamed>".to_string());
         printf!("{}Module: {name}", " ".repeat(indent));
     }
+    if handle.get_bool(Property::TopModule).unwrap_or(false) {
+        printf!("{}(Top-level module)", " ".repeat(indent + 1));
+    }
 
     let children = handle.iterator(ObjectType::Module);
     for child in children {
         walk_hierarchy(&child, indent + 1);
     }
+    printf!("\n{}Ports", " ".repeat(indent + 1));
+    printf!("{}=======", " ".repeat(indent + 1));
+    for signal in handle.iterators(&[ObjectType::Port]) {
+        let name = signal
+            .get_str(Property::Name)
+            .unwrap_or("<unnamed>".to_string());
+        let signal_type = signal
+            .get_str(Property::Type)
+            .unwrap_or("<unknown>".to_string());
+        let direction = signal
+            .get_direction()
+            .unwrap_or(vpi::Direction::NoDirection);
+        printf!(
+            "{}Signal: {name} ({signal_type}, {direction})",
+            " ".repeat(indent + 1)
+        );
+    }
+
     printf!("\n{}Signals", " ".repeat(indent + 1));
     printf!("{}=======", " ".repeat(indent + 1));
     for signal in handle.iterators(&[

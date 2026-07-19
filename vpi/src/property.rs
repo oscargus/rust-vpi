@@ -326,6 +326,18 @@ pub enum Direction {
     NoDirection = vpi_sys::vpiNoDirection,
 }
 
+impl std::fmt::Display for Direction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Direction::Input => write!(f, "Input"),
+            Direction::Output => write!(f, "Output"),
+            Direction::Inout => write!(f, "Inout"),
+            Direction::MixedIO => write!(f, "MixedIO"),
+            Direction::NoDirection => write!(f, "NoDirection"),
+        }
+    }
+}
+
 /// Net type classification for net objects.
 #[repr(u32)]
 #[derive(FromPrimitive, ToPrimitive, Debug, Clone, PartialEq, Eq)]
