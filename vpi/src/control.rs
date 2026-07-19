@@ -2,7 +2,7 @@ use vpi_sys::PLI_INT32;
 
 /// Simulator control operations for `vpi_control`.
 #[repr(u32)]
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Control {
     /// Pause simulation execution.
     Stop = vpi_sys::vpiStop,
@@ -17,7 +17,7 @@ pub enum Control {
 /// SystemVerilog coverage control operations for `vpi_control`.
 #[cfg(feature = "sv")]
 #[repr(u32)]
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CoverageControl {
     /// Start coverage collection.
     Start = vpi_sys::vpiCoverageStart,
@@ -36,7 +36,7 @@ pub enum CoverageControl {
 /// SystemVerilog assertion control operations for `vpi_control`.
 #[cfg(feature = "sv")]
 #[repr(u32)]
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AssertionControl {
     /// Lock assertion control state.
     Lock = vpi_sys::vpiAssertionLock,

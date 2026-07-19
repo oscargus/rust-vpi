@@ -3,7 +3,7 @@ use num_traits::FromPrimitive;
 
 /// Error severity levels reported by VPI.
 #[repr(u32)]
-#[derive(FromPrimitive, Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(FromPrimitive, Debug, Clone, PartialEq, Eq)]
 pub enum Severity {
     /// Informational notice.
     Notice = vpi_sys::vpiNotice,
@@ -31,7 +31,7 @@ impl std::fmt::Display for Severity {
 
 /// Simulation phase/state where an error occurred.
 #[repr(u32)]
-#[derive(FromPrimitive, Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(FromPrimitive, Debug, Clone, PartialEq, Eq)]
 pub enum ErrorState {
     /// Compile-time context.
     Compile = vpi_sys::vpiCompile,
