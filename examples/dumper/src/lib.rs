@@ -49,9 +49,7 @@ fn walk_hierarchy(handle: &Handle, indent: usize) {
     printf!("\n{}Ports", " ".repeat(indent + 1));
     printf!("{}=======", " ".repeat(indent + 1));
     for signal in handle.iterators(&[ObjectType::Port]) {
-        let name = signal
-            .get_str(Property::Name)
-            .unwrap_or("<unnamed>".to_string());
+        let name = signal.get_name().unwrap_or("<unnamed>".to_string());
         let signal_type = signal
             .get_str(Property::Type)
             .unwrap_or("<unknown>".to_string());

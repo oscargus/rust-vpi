@@ -52,6 +52,8 @@ jobs:
 
           cargo test -p vpi
 
+          cargo test --all-features -p vpi
+
           # Script-based integration paths that exercise vpi through example plugins.
           bash test_scripts/run_testbench.sh
           bash test_scripts/run_dumper.sh
