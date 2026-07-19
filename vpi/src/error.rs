@@ -3,7 +3,7 @@ use num_traits::FromPrimitive;
 
 /// Error severity levels reported by VPI.
 #[repr(u32)]
-#[derive(FromPrimitive)]
+#[derive(FromPrimitive, Debug, Copy, Clone, PartialEq, Eq)]
 pub enum Severity {
     /// Informational notice.
     Notice = vpi_sys::vpiNotice,
@@ -17,9 +17,21 @@ pub enum Severity {
     Internal = vpi_sys::vpiInternal,
 }
 
+impl std::fmt::Display for Severity {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Severity::Notice => write!(f, "Notice"),
+            Severity::Warning => write!(f, "Warning"),
+            Severity::Error => write!(f, "Error"),
+            Severity::System => write!(f, "System"),
+            Severity::Internal => write!(f, "Internal"),
+        }
+    }
+}
+
 /// Simulation phase/state where an error occurred.
 #[repr(u32)]
-#[derive(FromPrimitive)]
+#[derive(FromPrimitive, Debug, Copy, Clone, PartialEq, Eq)]
 pub enum ErrorState {
     /// Compile-time context.
     Compile = vpi_sys::vpiCompile,
@@ -29,7 +41,17 @@ pub enum ErrorState {
     Run = vpi_sys::vpiRun,
 }
 
+impl std::fmt::Display for ErrorState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ErrorState::Compile => write!(f, "Compile"),
+            ErrorState::PLI => write!(f, "PLI"),
+            ErrorState::Run => write!(f, "Run"),
+        }
+    }
+}
 /// Rich error information returned by `vpi_chk_error`.
+#[derive(Debug, Clone)]
 pub struct VPIError {
     /// Simulator-defined error code.
     pub code: String,
@@ -47,6 +69,20 @@ pub struct VPIError {
     pub product: String,
 }
 
+impl std::fmt::Display for VPIError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let severity_str = self.severity.as_ref().map(|s| s.to_string());
+        write!(
+            f,
+            "[{}] {} ({}:{}) - {}",
+            severity_str.as_deref().unwrap_or("Unknown"),
+            self.message,
+            self.file.as_deref().unwrap_or("Unknown"),
+            self.line,
+            self.product
+        )
+    }
+}
 /// Checks whether the simulator has a pending VPI error.
 ///
 /// Returns `None` when no error is present, otherwise returns the translated

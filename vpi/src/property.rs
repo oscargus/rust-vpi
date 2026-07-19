@@ -8,6 +8,7 @@ use crate::{Handle, ObjectType, Value, ValueType};
 ///
 /// Values map directly to `vpi_sys::vpi*` property constants.
 #[repr(i32)]
+#[derive(FromPrimitive, ToPrimitive, Debug, Copy, Clone, PartialEq, Eq)]
 pub enum Property {
     /// -1: undefined property
     Undefined = vpi_sys::vpiUndefined,
@@ -316,7 +317,7 @@ impl Property {
 
 /// Port direction classification.
 #[repr(u32)]
-#[derive(FromPrimitive, ToPrimitive)]
+#[derive(FromPrimitive, ToPrimitive, Debug, Copy, Clone, PartialEq, Eq)]
 pub enum Direction {
     Input = vpi_sys::vpiInput,
     Output = vpi_sys::vpiOutput,
@@ -327,7 +328,7 @@ pub enum Direction {
 
 /// Net type classification for net objects.
 #[repr(u32)]
-#[derive(FromPrimitive, ToPrimitive)]
+#[derive(FromPrimitive, ToPrimitive, Debug, Copy, Clone, PartialEq, Eq)]
 pub enum NetType {
     Wire = vpi_sys::vpiWire,
     Wand = vpi_sys::vpiWand,
@@ -362,7 +363,7 @@ bitflags::bitflags! {
 
 /// Literal/constant encoding type.
 #[repr(u32)]
-#[derive(FromPrimitive, ToPrimitive)]
+#[derive(FromPrimitive, ToPrimitive, Debug, Copy, Clone, PartialEq, Eq)]
 pub enum ConstType {
     Dec = vpi_sys::vpiDecConst,
     Binary = vpi_sys::vpiBinaryConst,
@@ -386,7 +387,7 @@ pub enum ConstType {
 
 /// Function return type classification.
 #[repr(u32)]
-#[derive(FromPrimitive, ToPrimitive)]
+#[derive(FromPrimitive, ToPrimitive, Debug, Copy, Clone, PartialEq, Eq)]
 pub enum FuncType {
     Int = vpi_sys::vpiIntFunc,
     Real = vpi_sys::vpiRealFunc,
@@ -399,7 +400,7 @@ pub enum FuncType {
 
 /// System function return type classification.
 #[repr(u32)]
-#[derive(FromPrimitive, ToPrimitive)]
+#[derive(FromPrimitive, ToPrimitive, Debug, Copy, Clone, PartialEq, Eq)]
 pub enum SysFuncType {
     Int = vpi_sys::vpiSysFuncInt,
     Real = vpi_sys::vpiSysFuncReal,
@@ -433,7 +434,7 @@ pub enum DistType {
 
 /// Primitive instance subtype.
 #[repr(u32)]
-#[derive(FromPrimitive, ToPrimitive)]
+#[derive(FromPrimitive, ToPrimitive, Debug, Copy, Clone, PartialEq, Eq)]
 pub enum PrimType {
     // Logic gates (1-8)
     /// 1: and gate
@@ -506,7 +507,7 @@ pub enum PrimType {
 
 /// Timing check subtype.
 #[repr(u32)]
-#[derive(FromPrimitive, ToPrimitive)]
+#[derive(FromPrimitive, ToPrimitive, Debug, Copy, Clone, PartialEq, Eq)]
 pub enum TchkType {
     /// 1: $setup timing check
     Setup = vpi_sys::vpiSetup,
@@ -536,7 +537,7 @@ pub enum TchkType {
 
 /// Operation subtype for expression objects.
 #[repr(u32)]
-#[derive(FromPrimitive, ToPrimitive)]
+#[derive(FromPrimitive, ToPrimitive, Debug, Copy, Clone, PartialEq, Eq)]
 pub enum OpType {
     // Unary operators (1-10)
     /// 1: unary minus

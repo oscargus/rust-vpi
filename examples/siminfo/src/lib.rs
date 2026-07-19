@@ -20,4 +20,9 @@ fn end_of_simulation(_cb_data: &vpi::CbData) {
         "End of simulation time: {}\n",
         vpi::current_simulation_time()
     );
+    if let Some(error) = vpi::check_error() {
+        vpi::printf!("Last error: {}\n", error);
+    } else {
+        vpi::printf!("No errors reported.\n");
+    }
 }

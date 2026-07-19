@@ -8,7 +8,7 @@ use vpi_sys::PLI_INT32;
 use crate::{Handle, Property, Time};
 
 /// High-level value representation returned from or written to VPI objects.
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Value {
     /// Binary string value.
     BinStr(String),
@@ -99,7 +99,7 @@ impl Display for Value {
 }
 
 #[repr(u32)]
-#[derive(FromPrimitive, ToPrimitive, Debug, Copy, Clone)]
+#[derive(FromPrimitive, ToPrimitive, Debug, Copy, Clone, PartialEq, Eq)]
 /// VPI value format tags used with `vpi_get_value` and related APIs.
 pub enum ValueType {
     /// Binary string format.
@@ -211,7 +211,7 @@ impl From<ScalarValue> for char {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 /// Scalar logic value plus drive strengths.
 pub struct StrengthValue {
     /// Scalar logic state carried by the value.
