@@ -111,7 +111,7 @@ impl Timescale {
     ///
     /// # Safety
     /// The handle must be a valid VPI module handle
-    pub unsafe fn from_module(module_handle: vpi_sys::vpiHandle) -> Option<Self> {
+    unsafe fn from_module(module_handle: vpi_sys::vpiHandle) -> Option<Self> {
         // SAFETY: Caller guarantees module_handle is valid
         let unit =
             unsafe { vpi_sys::vpi_get(crate::Property::TimeUnit as PLI_INT32, module_handle) };

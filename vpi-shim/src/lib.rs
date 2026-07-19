@@ -122,19 +122,30 @@ macro_rules! forward_fn_void {
 #[cfg(any(target_os = "windows", target_os = "macos"))]
 forward_fn! {
     fn vpi_register_cb(cb_data_p: vpi_sys::p_cb_data) -> vpi_sys::vpiHandle;
+    fn vpi_register_systf(systf_data_p: vpi_sys::p_vpi_systf_data) -> vpi_sys::vpiHandle;
     fn vpi_remove_cb(cb_obj: vpi_sys::vpiHandle) -> vpi_sys::PLI_INT32;
     fn vpi_handle(type_: vpi_sys::PLI_INT32, refHandle: vpi_sys::vpiHandle) -> vpi_sys::vpiHandle;
+    fn vpi_handle_multi(type_: vpi_sys::PLI_INT32, refHandle1: vpi_sys::vpiHandle, refHandle2: vpi_sys::vpiHandle) -> vpi_sys::vpiHandle;
     fn vpi_handle_by_name(name: *mut vpi_sys::PLI_BYTE8, scope: vpi_sys::vpiHandle) -> vpi_sys::vpiHandle;
     fn vpi_handle_by_index(object: vpi_sys::vpiHandle, indx: vpi_sys::PLI_INT32) -> vpi_sys::vpiHandle;
+    fn vpi_handle_by_multi_index(obj: vpi_sys::vpiHandle, num_index: vpi_sys::PLI_INT32, index_array: *mut vpi_sys::PLI_INT32) -> vpi_sys::vpiHandle;
     fn vpi_iterate(type_: vpi_sys::PLI_INT32, refHandle: vpi_sys::vpiHandle) -> vpi_sys::vpiHandle;
     fn vpi_scan(iterator: vpi_sys::vpiHandle) -> vpi_sys::vpiHandle;
     fn vpi_get(property: vpi_sys::PLI_INT32, object: vpi_sys::vpiHandle) -> vpi_sys::PLI_INT32;
+    fn vpi_get64(property: vpi_sys::PLI_INT32, object: vpi_sys::vpiHandle) -> vpi_sys::PLI_INT64;
     fn vpi_get_str(property: vpi_sys::PLI_INT32, object: vpi_sys::vpiHandle) -> *mut vpi_sys::PLI_BYTE8;
     fn vpi_get_vlog_info(vlog_info_p: vpi_sys::p_vpi_vlog_info) -> vpi_sys::PLI_INT32;
     fn vpi_control(operation: vpi_sys::PLI_INT32) -> vpi_sys::PLI_INT32;
     fn vpi_compare_objects(object1: vpi_sys::vpiHandle, object2: vpi_sys::vpiHandle) -> vpi_sys::PLI_INT32;
     fn vpi_chk_error(error_info_p: vpi_sys::p_vpi_error_info) -> vpi_sys::PLI_INT32;
     fn vpi_release_handle(object: vpi_sys::vpiHandle) -> vpi_sys::PLI_INT32;
+    fn vpi_flush() -> vpi_sys::PLI_INT32;
+    fn vpi_put_value(
+        object: vpi_sys::vpiHandle,
+        value_p: vpi_sys::p_vpi_value,
+        time_p: vpi_sys::p_vpi_time,
+        flags: vpi_sys::PLI_INT32,
+    ) -> vpi_sys::vpiHandle;
     fn vpi_mcd_open(fileName: *mut vpi_sys::PLI_BYTE8) -> vpi_sys::PLI_UINT32;
     fn vpi_mcd_close(mcd: vpi_sys::PLI_UINT32) -> vpi_sys::PLI_UINT32;
     fn vpi_mcd_name(cd: vpi_sys::PLI_UINT32) -> *mut vpi_sys::PLI_BYTE8;
@@ -148,6 +159,8 @@ forward_fn! {
 #[cfg(any(target_os = "windows", target_os = "macos"))]
 forward_fn_void! {
     fn vpi_get_cb_info(object: vpi_sys::vpiHandle, cb_data_p: vpi_sys::p_cb_data);
+    fn vpi_get_delays(object: vpi_sys::vpiHandle, delay_p: vpi_sys::p_vpi_delay);
+    fn vpi_put_delays(object: vpi_sys::vpiHandle, delay_p: vpi_sys::p_vpi_delay);
     fn vpi_get_time(object: vpi_sys::vpiHandle, time_p: vpi_sys::p_vpi_time);
     fn vpi_get_value(expr: vpi_sys::vpiHandle, value_p: vpi_sys::p_vpi_value);
     fn vpi_get_value_array(
@@ -156,4 +169,14 @@ forward_fn_void! {
         index_p: *mut vpi_sys::PLI_INT32,
         num: vpi_sys::PLI_UINT32,
     );
+}
+
+#[cfg(all(feature = "sv", any(target_os = "windows", target_os = "macos")))]
+forward_fn! {
+    fn vpi_register_assertion_cb(
+        assertion: vpi_sys::vpiHandle,
+        reason: vpi_sys::PLI_INT32,
+        cb_rtn: vpi_sys::vpi_assertion_callback_func,
+        user_data: *mut vpi_sys::PLI_BYTE8,
+    ) -> vpi_sys::vpiHandle;
 }

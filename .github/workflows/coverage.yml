@@ -1,0 +1,99 @@
+name: Coverage
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  coverage-vpi:
+    name: Coverage (vpi)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@3c5f7ea28cd621ae0bf5283f0e981fb97b8a7af9 # master
+        with:
+          toolchain: stable
+          components: llvm-tools-preview
+
+      - name: (Restore from) Rust cache
+        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+
+      - name: Install coverage tooling
+        uses: taiki-e/cache-cargo-install-action@417450f3c33ee20393705369577571770643d4c7 # v3.0.7
+        with:
+          tool: cargo-llvm-cov
+
+      - name: Install Icarus Verilog
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y iverilog
+
+      - name: Collect coverage (tests + VPI scripts)
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          cargo llvm-cov clean --workspace
+
+          # Instrument the entire workspace so coverage includes vpi usage from examples.
+          source <(cargo llvm-cov show-env --export-prefix)
+
+          export CARGO_BUILD_PROFILE=debug
+
+          cargo test -p vpi
+
+          # Script-based integration paths that exercise vpi through example plugins.
+          bash test_scripts/run_testbench.sh
+          bash test_scripts/run_dumper.sh
+          bash test_scripts/run_timescale_test.sh
+          bash test_scripts/run_systf_test.sh
+          bash test_scripts/run_put_value_test.sh
+
+          cargo llvm-cov report --package vpi --html --output-dir coverage-html
+          cargo llvm-cov report --package vpi --lcov --output-path lcov.info
+          cargo llvm-cov report --package vpi --summary-only
+
+      - name: Upload vpi coverage artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: vpi-coverage-lcov
+          path: lcov.info
+
+      - name: Upload vpi coverage HTML artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: vpi-coverage-html
+          path: coverage-html
+
+      - name: Upload GitHub Pages artifact
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: coverage-html
+
+  deploy-coverage-pages:
+    name: Deploy Coverage Pages
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    needs: coverage-vpi
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

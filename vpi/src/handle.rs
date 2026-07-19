@@ -109,6 +109,57 @@ impl Handle {
     pub fn iterators<'a>(&'a self, typ: &'a [ObjectType]) -> impl Iterator<Item = Handle> + 'a {
         typ.iter().copied().flat_map(move |t| self.iterator(t))
     }
+
+    /// Returns a related object handle selected by `typ` using two reference handles.
+    ///
+    /// This wraps `vpi_handle_multi` for APIs that require two source handles.
+    /// Returns a null handle when this handle or `other` is null, or when the
+    /// relation is unavailable.
+    #[must_use]
+    pub fn get_multi(&self, typ: ObjectType, other: &Handle) -> Self {
+        if self.is_null() || other.is_null() {
+            return Self::null();
+        }
+
+        let handle =
+            unsafe { vpi_sys::vpi_handle_multi(typ as PLI_INT32, self.as_raw(), other.as_raw()) };
+        Self::from_raw(handle)
+    }
+
+    /// Returns a child handle by multiple indices.
+    ///
+    /// This wraps `vpi_handle_by_multi_index` and is used for
+    /// multidimensional arrays. Returns a null handle when this handle is null,
+    /// when `indices` is empty, when the index count exceeds VPI limits, or
+    /// when no object exists at the requested index tuple.
+    #[must_use]
+    pub fn handle_by_multi_index(&self, indices: &[i32]) -> Self {
+        if self.is_null() || indices.is_empty() {
+            return Self::null();
+        }
+
+        let Ok(num_index) = i32::try_from(indices.len()) else {
+            return Self::null();
+        };
+
+        let handle = unsafe {
+            vpi_sys::vpi_handle_by_multi_index(
+                self.as_raw(),
+                num_index as PLI_INT32,
+                indices.as_ptr().cast_mut(),
+            )
+        };
+        Self::from_raw(handle)
+    }
+
+    /// Convenience helper for multi-handle traversal.
+    ///
+    /// First traverses to `typ` via `vpi_handle`, then resolves a
+    /// multidimensional element with `vpi_handle_by_multi_index`.
+    #[must_use]
+    pub fn multi_handle_traversal(&self, typ: ObjectType, indices: &[i32]) -> Self {
+        self.get(typ).handle_by_multi_index(indices)
+    }
 }
 
 /// Iterator over VPI scan results from `vpi_iterate`/`vpi_scan`.

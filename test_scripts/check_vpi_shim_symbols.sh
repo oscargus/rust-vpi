@@ -10,8 +10,15 @@ if ! command -v rg >/dev/null 2>&1; then
   exit 1
 fi
 
-used_symbols="$(rg -No --no-line-number --no-filename 'vpi_sys::(vpi_[A-Za-z0-9_]+)' vpi/src -r '$1' | sort -u)"
-forwarded_symbols="$(rg -No --no-line-number --no-filename 'fn (vpi_[A-Za-z0-9_]+)\(' vpi-shim/src/lib.rs -r '$1' | sort -u)"
+used_symbols="$({
+  # Match both direct `vpi_sys::vpi_*` and formatted variants split by whitespace/newlines.
+  rg -No --pcre2 -U --no-line-number --no-filename 'vpi_sys::\s*(vpi_[A-Za-z0-9_]+)' vpi/src -r '$1'
+} | sort -u)"
+
+forwarded_symbols="$({
+  # Forwarded symbols are declared as `fn vpi_*(` inside forward_fn!/forward_fn_void! invocations.
+  rg -No --pcre2 -U --no-line-number --no-filename 'fn\s+(vpi_[A-Za-z0-9_]+)\s*\(' vpi-shim/src/lib.rs -r '$1'
+} | sort -u)"
 
 missing_symbols="$(comm -23 \
   <(printf '%s\n' "$used_symbols") \
@@ -20,7 +27,7 @@ missing_symbols="$(comm -23 \
 
 if [[ -n "$missing_symbols" ]]; then
   echo "error: vpi-shim is missing forwarded symbols used by vpi crate:"
-  printf '  - %s\n' $missing_symbols
+  printf '%s\n' "$missing_symbols" | sed 's/^/  - /'
   exit 1
 fi
 

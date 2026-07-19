@@ -3,7 +3,7 @@ use std::fmt::Display;
 use crate::Handle;
 
 /// Time value representation used by VPI APIs.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Time {
     /// Simulator time encoded as a 64-bit tick value.
     Sim(u64),
@@ -38,18 +38,24 @@ impl From<vpi_sys::s_vpi_time> for Time {
 
 impl From<Time> for vpi_sys::s_vpi_time {
     fn from(time: Time) -> Self {
+        vpi_sys::s_vpi_time::from(&time)
+    }
+}
+
+impl From<&Time> for vpi_sys::s_vpi_time {
+    fn from(time: &Time) -> Self {
         match time {
             Time::Sim(sim_time) => vpi_sys::s_vpi_time {
                 type_: vpi_sys::vpiSimTime as i32,
-                high: (sim_time >> 32) as u32,
-                low: (sim_time & 0xFFFF_FFFF) as u32,
+                high: (*sim_time >> 32) as u32,
+                low: (*sim_time & 0xFFFF_FFFF) as u32,
                 real: 0.0,
             },
             Time::ScaledReal(scaled_real) => vpi_sys::s_vpi_time {
                 type_: vpi_sys::vpiScaledRealTime as i32,
                 high: 0,
                 low: 0,
-                real: scaled_real,
+                real: *scaled_real,
             },
             Time::Suppress => vpi_sys::s_vpi_time {
                 type_: vpi_sys::vpiSuppressTime as i32,

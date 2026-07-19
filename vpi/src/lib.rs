@@ -18,12 +18,14 @@ mod macros;
 
 mod callback;
 mod control;
+mod delays;
 mod error;
 mod handle;
 mod mcd;
 mod object;
 mod property;
 mod simulator;
+mod systf;
 mod time;
 mod value;
 
@@ -31,12 +33,14 @@ use std::ffi::CString;
 
 pub use callback::*;
 pub use control::*;
+pub use delays::*;
 pub use error::*;
 pub use handle::*;
 pub use mcd::*;
 pub use object::*;
 pub use property::*;
 pub use simulator::*;
+pub use systf::*;
 pub use time::*;
 pub use value::*;
 
@@ -52,6 +56,19 @@ pub fn printf(msg: impl AsRef<str>) {
             cstr.as_ptr().cast::<vpi_sys::PLI_BYTE8>().cast_mut(),
         )
     };
+}
+
+/// Flushes the simulator's default output streams via `vpi_flush`.
+///
+/// Returns `Ok(())` on success (`0`) and `Err(code)` otherwise.
+#[must_use]
+pub fn flush() -> Result<(), i32> {
+    let code = unsafe { vpi_sys::vpi_flush() };
+    if code == 0 {
+        Ok(())
+    } else {
+        Err(code)
+    }
 }
 
 /// `format!`-style wrapper around [`printf`].
