@@ -407,6 +407,30 @@ pub enum SysFuncType {
     Sized = vpi_sys::vpiSysFuncSized,
 }
 
+#[cfg(feature = "sv")]
+#[repr(u32)]
+#[derive(FromPrimitive, ToPrimitive, Copy, Clone, Debug, PartialEq, Eq)]
+/// SystemVerilog randomization qualifier for variables.
+pub enum RandType {
+    /// Variable is not randomized.
+    NotRand = vpi_sys::vpiNotRand,
+    /// Variable is randomized with `rand`.
+    Rand = vpi_sys::vpiRand,
+    /// Variable is randomized with `randc`.
+    RandC = vpi_sys::vpiRandC,
+}
+
+#[cfg(feature = "sv")]
+#[repr(u32)]
+#[derive(FromPrimitive, ToPrimitive, Copy, Clone, Debug, PartialEq, Eq)]
+/// SystemVerilog distribution style used by distribution constraints.
+pub enum DistType {
+    /// Equal-distribution constraint.
+    Equal = vpi_sys::vpiEqualDist,
+    /// Divided-distribution constraint.
+    Div = vpi_sys::vpiDivDist,
+}
+
 /// Primitive instance subtype.
 #[repr(u32)]
 #[derive(FromPrimitive, ToPrimitive)]
@@ -807,6 +831,11 @@ impl Handle {
                 let value = vpi_sys::vpi_get(property as PLI_INT32, self.as_raw());
                 Some(value as u32)
             },
+            #[cfg(feature = "sv")]
+            Property::RandType | Property::DistType => unsafe {
+                let value = vpi_sys::vpi_get(property as PLI_INT32, self.as_raw());
+                Some(value as u32)
+            },
             _ => None, // For simplicity, only handle common properties here
         }
     }
@@ -871,6 +900,11 @@ impl Handle {
             | Property::ModPathHasIfNone
             | Property::IsMemory
             | Property::IsProtected => unsafe {
+                let value = vpi_sys::vpi_get(property as PLI_INT32, self.as_raw());
+                Some(value != 0)
+            },
+            #[cfg(feature = "sv")]
+            Property::IsRandomized | Property::IsConstraintEnabled | Property::Soft => unsafe {
                 let value = vpi_sys::vpi_get(property as PLI_INT32, self.as_raw());
                 Some(value != 0)
             },
@@ -995,5 +1029,139 @@ impl Handle {
             Some(Value::Int(value)) => Some(value),
             _ => None,
         }
+    }
+
+    #[cfg(feature = "sv")]
+    /// Returns whether this object participates in randomization.
+    #[must_use]
+    pub fn is_randomized(&self) -> Option<bool> {
+        self.get_bool(Property::IsRandomized)
+    }
+
+    #[cfg(feature = "sv")]
+    /// Returns the SystemVerilog randomization qualifier (`rand`, `randc`, etc.).
+    #[must_use]
+    pub fn get_rand_type(&self) -> Option<RandType> {
+        if self.is_null() {
+            return None;
+        }
+        let raw = unsafe { vpi_sys::vpi_get(Property::RandType as PLI_INT32, self.as_raw()) };
+        RandType::from_u32(raw as u32)
+    }
+
+    #[cfg(feature = "sv")]
+    /// Returns whether this constraint object is enabled.
+    #[must_use]
+    pub fn is_constraint_enabled(&self) -> Option<bool> {
+        self.get_bool(Property::IsConstraintEnabled)
+    }
+
+    #[cfg(feature = "sv")]
+    /// Returns whether this constraint object is declared `soft`.
+    #[must_use]
+    pub fn is_constraint_soft(&self) -> Option<bool> {
+        self.get_bool(Property::Soft)
+    }
+
+    #[cfg(feature = "sv")]
+    /// Returns distribution style metadata for distribution constraints.
+    #[must_use]
+    pub fn get_dist_type(&self) -> Option<DistType> {
+        if self.is_null() {
+            return None;
+        }
+        let raw = unsafe { vpi_sys::vpi_get(Property::DistType as PLI_INT32, self.as_raw()) };
+        DistType::from_u32(raw as u32)
+    }
+
+    #[cfg(feature = "sv")]
+    /// Iterates class constraints reachable from this object.
+    #[must_use]
+    pub fn get_constraints(&self) -> Vec<Handle> {
+        if self.is_null() {
+            return Vec::new();
+        }
+        self.iterator(ObjectType::Constraint).collect()
+    }
+
+    #[cfg(feature = "sv")]
+    /// Iterates constraint-ordering nodes (`solve ... before ...`) on this object.
+    #[must_use]
+    pub fn get_constraint_ordering(&self) -> Vec<Handle> {
+        if self.is_null() {
+            return Vec::new();
+        }
+        self.iterator(ObjectType::ConstraintOrdering).collect()
+    }
+
+    #[cfg(feature = "sv")]
+    /// Iterates constraint items for this constraint object.
+    #[must_use]
+    pub fn get_constraint_items(&self) -> Vec<Handle> {
+        if self.is_null() {
+            return Vec::new();
+        }
+        self.iterator(ObjectType::ConstraintItem).collect()
+    }
+
+    #[cfg(feature = "sv")]
+    /// Iterates `solve before` edges under a constraint-ordering object.
+    #[must_use]
+    pub fn get_solve_before(&self) -> Vec<Handle> {
+        if self.is_null() {
+            return Vec::new();
+        }
+        self.iterator(ObjectType::SolveBefore).collect()
+    }
+
+    #[cfg(feature = "sv")]
+    /// Iterates `solve after` edges under a constraint-ordering object.
+    #[must_use]
+    pub fn get_solve_after(&self) -> Vec<Handle> {
+        if self.is_null() {
+            return Vec::new();
+        }
+        self.iterator(ObjectType::SolveAfter).collect()
+    }
+
+    #[cfg(feature = "sv")]
+    /// Iterates distribution-item nodes (`dist` list entries).
+    #[must_use]
+    pub fn get_distribution_items(&self) -> Vec<Handle> {
+        if self.is_null() {
+            return Vec::new();
+        }
+        self.iterator(ObjectType::DistItem).collect()
+    }
+}
+
+#[cfg(all(test, feature = "sv"))]
+mod tests {
+    use super::{DistType, RandType};
+    use crate::Handle;
+
+    #[test]
+    fn sv_constraint_helpers_on_null_handle_are_safe() {
+        let h = Handle::null();
+        assert_eq!(h.is_randomized(), None);
+        assert_eq!(h.get_rand_type(), None);
+        assert_eq!(h.is_constraint_enabled(), None);
+        assert_eq!(h.is_constraint_soft(), None);
+        assert_eq!(h.get_dist_type(), None);
+        assert!(h.get_constraints().is_empty());
+        assert!(h.get_constraint_ordering().is_empty());
+        assert!(h.get_constraint_items().is_empty());
+        assert!(h.get_solve_before().is_empty());
+        assert!(h.get_solve_after().is_empty());
+        assert!(h.get_distribution_items().is_empty());
+    }
+
+    #[test]
+    fn sv_rand_and_dist_values_match_vpi_constants() {
+        assert_eq!(RandType::NotRand as u32, vpi_sys::vpiNotRand);
+        assert_eq!(RandType::Rand as u32, vpi_sys::vpiRand);
+        assert_eq!(RandType::RandC as u32, vpi_sys::vpiRandC);
+        assert_eq!(DistType::Equal as u32, vpi_sys::vpiEqualDist);
+        assert_eq!(DistType::Div as u32, vpi_sys::vpiDivDist);
     }
 }

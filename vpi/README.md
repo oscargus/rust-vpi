@@ -40,16 +40,19 @@ The safe `vpi` crate covers the common plugin workflows in `vpi_user.h`:
 - systf registration and argument access
 - simulator control/time helpers
 - basic simulator and MCD output helpers
+- sv-gated constraint/randomization helpers
 
 Some lower-level `vpi_user.h` entry points are still only available through
 `vpi-sys`, notably:
 
-- `vpi_get_systf_info`
-- `vpi_put_value_array`
 - save/restart state APIs: `vpi_get_data`, `vpi_put_data`
 - per-handle user data APIs: `vpi_get_userdata`, `vpi_put_userdata`
-- varargs print APIs: `vpi_vprintf`, `vpi_mcd_vprintf`
 - explicit object lifetime API: `vpi_free_object`
+
+The varargs print functions `vpi_vprintf` and `vpi_mcd_vprintf`
+will not be supported in `vpi` since it is preferred that the
+formatting is done in Rust. If you have a reason to use these from
+Rust, let me know!
 
 SystemVerilog support from `sv_vpi_user.h` is also partial at the high-level
 API layer. The crate exposes many SV object and property constants through the
@@ -60,7 +63,6 @@ SV-specific modeling areas such as:
 - packages, interfaces, programs, and virtual interfaces
 - class/type-spec trees and type parameters
 - clocking blocks and clocking I/O
-- constraint/randomization structures
 - property/sequence AST-style traversal helpers
 
 If you need one of these areas today, use `vpi-sys` directly for that portion

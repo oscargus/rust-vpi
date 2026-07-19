@@ -67,6 +67,25 @@ pub type RawSystfData = vpi_sys::s_vpi_systf_data;
 /// Function pointer type for VPI system task/function callbacks.
 pub type SystfCallback = unsafe extern "C" fn(*mut c_char) -> i32;
 
+/// Owned view of data returned by `vpi_get_systf_info`.
+#[derive(Debug, Clone)]
+pub struct SystfInfo {
+    /// Raw system task/function kind (`vpiSysTask` or `vpiSysFunc`).
+    pub kind: i32,
+    /// Raw system-function return classification from VPI.
+    pub sys_func_type: i32,
+    /// Registered system task/function name, if present.
+    pub name: Option<String>,
+    /// `calltf` callback pointer returned by VPI.
+    pub calltf: Option<SystfCallback>,
+    /// `compiletf` callback pointer returned by VPI.
+    pub compiletf: Option<SystfCallback>,
+    /// `sizetf` callback pointer returned by VPI.
+    pub sizetf: Option<SystfCallback>,
+    /// User-data pointer returned by VPI.
+    pub user_data: *mut c_char,
+}
+
 /// System task/function registration kind.
 #[repr(u32)]
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -129,6 +148,73 @@ pub fn current_systf_call() -> Handle {
     Handle::null().get(ObjectType::SysTfCall)
 }
 
+/// Retrieves raw system task/function metadata for a VPI object.
+///
+/// This is a thin wrapper around `vpi_get_systf_info`.
+///
+/// Returns `None` when `object` is null.
+#[must_use]
+pub fn get_systf_info_raw(object: &Handle) -> Option<RawSystfData> {
+    if object.is_null() {
+        return None;
+    }
+
+    let mut data = RawSystfData {
+        type_: 0,
+        sysfunctype: 0,
+        tfname: std::ptr::null_mut(),
+        calltf: None,
+        compiletf: None,
+        sizetf: None,
+        user_data: std::ptr::null_mut(),
+    };
+
+    unsafe {
+        vpi_sys::vpi_get_systf_info(object.as_raw(), &raw mut data);
+    }
+
+    Some(data)
+}
+
+/// Retrieves owned system task/function metadata for a VPI object.
+///
+/// This calls [`get_systf_info_raw`] and converts the returned C string name
+/// into an owned Rust [`String`] when present.
+///
+/// Returns `None` when `object` is null.
+#[must_use]
+pub fn get_systf_info(object: &Handle) -> Option<SystfInfo> {
+    let data = get_systf_info_raw(object)?;
+    let name = if data.tfname.is_null() {
+        None
+    } else {
+        Some(
+            unsafe { CStr::from_ptr(data.tfname) }
+                .to_string_lossy()
+                .into_owned(),
+        )
+    };
+
+    Some(SystfInfo {
+        kind: data.type_,
+        sys_func_type: data.sysfunctype,
+        name,
+        calltf: data.calltf,
+        compiletf: data.compiletf,
+        sizetf: data.sizetf,
+        user_data: data.user_data,
+    })
+}
+
+/// Retrieves owned system task/function metadata for the current `calltf`.
+///
+/// Returns `None` when called outside a `calltf` context.
+#[must_use]
+pub fn current_systf_info() -> Option<SystfInfo> {
+    let call = current_systf_call();
+    get_systf_info(&call)
+}
+
 /// Returns one system task/function argument by index in a requested format.
 ///
 /// The index is zero-based (`0` is the first argument).
@@ -172,4 +258,17 @@ pub fn get_systf_args(formats: &[ValueType]) -> Vec<Option<Value>> {
         .iter()
         .map(|format| args.next().and_then(|arg| arg.get_value(*format)))
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{get_systf_info, get_systf_info_raw};
+    use crate::Handle;
+
+    #[test]
+    fn get_systf_info_on_null_handle_returns_none() {
+        let h = Handle::null();
+        assert!(get_systf_info_raw(&h).is_none());
+        assert!(get_systf_info(&h).is_none());
+    }
 }

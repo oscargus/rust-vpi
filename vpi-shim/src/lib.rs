@@ -159,12 +159,19 @@ forward_fn! {
 #[cfg(any(target_os = "windows", target_os = "macos"))]
 forward_fn_void! {
     fn vpi_get_cb_info(object: vpi_sys::vpiHandle, cb_data_p: vpi_sys::p_cb_data);
+    fn vpi_get_systf_info(object: vpi_sys::vpiHandle, systf_data_p: vpi_sys::p_vpi_systf_data);
     fn vpi_get_delays(object: vpi_sys::vpiHandle, delay_p: vpi_sys::p_vpi_delay);
     fn vpi_put_delays(object: vpi_sys::vpiHandle, delay_p: vpi_sys::p_vpi_delay);
     fn vpi_get_time(object: vpi_sys::vpiHandle, time_p: vpi_sys::p_vpi_time);
     fn vpi_get_value(expr: vpi_sys::vpiHandle, value_p: vpi_sys::p_vpi_value);
     fn vpi_get_value_array(
         expr: vpi_sys::vpiHandle,
+        arrayvalue_p: vpi_sys::p_vpi_arrayvalue,
+        index_p: *mut vpi_sys::PLI_INT32,
+        num: vpi_sys::PLI_UINT32,
+    );
+    fn vpi_put_value_array(
+        object: vpi_sys::vpiHandle,
         arrayvalue_p: vpi_sys::p_vpi_arrayvalue,
         index_p: *mut vpi_sys::PLI_INT32,
         num: vpi_sys::PLI_UINT32,

@@ -3,7 +3,7 @@ use std::fmt::Display;
 
 use num_derive::{FromPrimitive, ToPrimitive};
 use num_traits::FromPrimitive;
-use vpi_sys::{PLI_INT32, PLI_UINT32};
+use vpi_sys::PLI_INT32;
 
 use crate::{Handle, Property, Time};
 
@@ -306,6 +306,24 @@ struct PutValuePayload {
     _strength: Option<Box<vpi_sys::t_vpi_strengthval>>,
 }
 
+#[cfg(feature = "value_array")]
+struct PutValueArrayPayload {
+    /// Raw VPI array value record passed to `vpi_put_value_array`.
+    raw: vpi_sys::t_vpi_arrayvalue,
+    /// Backing storage for integer-valued payloads referenced by `raw`.
+    _integers: Option<Vec<i32>>,
+    /// Backing storage for short-integer-valued payloads referenced by `raw`.
+    _shortints: Option<Vec<i16>>,
+    /// Backing storage for long-integer-valued payloads referenced by `raw`.
+    _longints: Option<Vec<i64>>,
+    /// Backing storage for time-valued payloads referenced by `raw`.
+    _times: Option<Vec<vpi_sys::t_vpi_time>>,
+    /// Backing storage for real-valued payloads referenced by `raw`.
+    _reals: Option<Vec<f64>>,
+    /// Backing storage for short-real-valued payloads referenced by `raw`.
+    _shortreals: Option<Vec<f32>>,
+}
+
 fn scalar_to_ab_bits(value: ScalarValue) -> (i32, i32) {
     match value {
         ScalarValue::Zero | ScalarValue::L => (0, 0),
@@ -487,6 +505,132 @@ fn encode_value_for_put(value: &Value) -> PutValuePayload {
     payload
 }
 
+#[cfg(feature = "value_array")]
+fn encode_value_array_for_put(
+    values: &[Value],
+    flags: PutValueArrayFlags,
+) -> Option<PutValueArrayPayload> {
+    let mut payload = PutValueArrayPayload {
+        raw: vpi_sys::t_vpi_arrayvalue {
+            format: 0,
+            flags: flags.bits(),
+            value: vpi_sys::t_vpi_arrayvalue__bindgen_ty_1 {
+                integers: std::ptr::null_mut(),
+            },
+        },
+        _integers: None,
+        _shortints: None,
+        _longints: None,
+        _times: None,
+        _reals: None,
+        _shortreals: None,
+    };
+
+    match values.first()? {
+        Value::Int(_) => {
+            let integers: Option<Vec<i32>> = values
+                .iter()
+                .map(|value| match value {
+                    Value::Int(integer) => Some(*integer),
+                    _ => None,
+                })
+                .collect();
+            let mut integers = integers?;
+            payload.raw.format = vpi_sys::vpiIntVal;
+            payload.raw.value = vpi_sys::t_vpi_arrayvalue__bindgen_ty_1 {
+                integers: integers.as_mut_ptr(),
+            };
+            payload._integers = Some(integers);
+        }
+        Value::ShortInt(_) => {
+            let shortints: Option<Vec<i16>> = values
+                .iter()
+                .map(|value| match value {
+                    Value::ShortInt(integer) => Some(*integer),
+                    _ => None,
+                })
+                .collect();
+            let mut shortints = shortints?;
+            payload.raw.format = vpi_sys::vpiShortIntVal;
+            payload.raw.value = vpi_sys::t_vpi_arrayvalue__bindgen_ty_1 {
+                shortints: shortints.as_mut_ptr(),
+            };
+            payload._shortints = Some(shortints);
+        }
+        Value::LongInt(_) => {
+            let longints: Option<Vec<i64>> = values
+                .iter()
+                .map(|value| match value {
+                    Value::LongInt(integer) => Some(*integer),
+                    _ => None,
+                })
+                .collect();
+            let mut longints = longints?;
+            payload.raw.format = vpi_sys::vpiLongIntVal;
+            payload.raw.value = vpi_sys::t_vpi_arrayvalue__bindgen_ty_1 {
+                longints: longints.as_mut_ptr(),
+            };
+            payload._longints = Some(longints);
+        }
+        Value::Real(_) => {
+            let reals: Option<Vec<f64>> = values
+                .iter()
+                .map(|value| match value {
+                    Value::Real(real) => Some(*real),
+                    _ => None,
+                })
+                .collect();
+            let mut reals = reals?;
+            payload.raw.format = vpi_sys::vpiRealVal;
+            payload.raw.value = vpi_sys::t_vpi_arrayvalue__bindgen_ty_1 {
+                reals: reals.as_mut_ptr(),
+            };
+            payload._reals = Some(reals);
+        }
+        Value::ShortReal(_) => {
+            let shortreals: Option<Vec<f32>> = values
+                .iter()
+                .map(|value| match value {
+                    Value::ShortReal(real) => Some(*real),
+                    _ => None,
+                })
+                .collect();
+            let mut shortreals = shortreals?;
+            payload.raw.format = vpi_sys::vpiShortRealVal;
+            payload.raw.value = vpi_sys::t_vpi_arrayvalue__bindgen_ty_1 {
+                shortreals: shortreals.as_mut_ptr(),
+            };
+            payload._shortreals = Some(shortreals);
+        }
+        Value::Time(_) => {
+            let times: Option<Vec<vpi_sys::t_vpi_time>> = values
+                .iter()
+                .map(|value| match value {
+                    Value::Time(time) => {
+                        let time = vpi_sys::s_vpi_time::from(time);
+                        Some(vpi_sys::t_vpi_time {
+                            type_: time.type_,
+                            high: time.high,
+                            low: time.low,
+                            real: time.real,
+                        })
+                    }
+                    _ => None,
+                })
+                .collect();
+            let mut times = times?;
+            payload.raw.format = vpi_sys::vpiTimeVal;
+            payload.raw.value = vpi_sys::t_vpi_arrayvalue__bindgen_ty_1 {
+                times: times.as_mut_ptr(),
+            };
+            payload._times = Some(times);
+        }
+        _ => return None,
+    }
+
+    Some(payload)
+}
+
 impl Display for Strength {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let name = match self {
@@ -508,6 +652,18 @@ bitflags::bitflags! {
     pub struct PutValueFlags: u32 {
         /// Return an event handle for the scheduled value update.
         const ReturnEvent = vpi_sys::vpiReturnEvent;
+        /// Indicates that associated storage is managed by user code.
+        const UserAllocFlag = vpi_sys::vpiUserAllocFlag;
+        /// Restrict the update to a single value.
+        const OneValue = vpi_sys::vpiOneValue;
+        /// Disable propagation for the value update.
+        const PropagateOff = vpi_sys::vpiPropagateOff;
+    }
+}
+
+bitflags::bitflags! {
+    /// Flags controlling behavior of `vpi_put_value_array`.
+    pub struct PutValueArrayFlags: u32 {
         /// Indicates that associated storage is managed by user code.
         const UserAllocFlag = vpi_sys::vpiUserAllocFlag;
         /// Restrict the update to a single value.
@@ -871,6 +1027,111 @@ impl Handle {
         self.put_value(&Value::Int(value))
     }
 
+    /// Writes an array of values to this handle using `vpi_put_value_array`.
+    ///
+    /// The input slice must be homogeneous and currently supports integer,
+    /// short integer, long integer, real, short real, and time values.
+    /// Returns `false` for null handles or unsupported/mixed value slices.
+    #[must_use]
+    #[cfg(feature = "value_array")]
+    pub fn put_value_array(&self, values: &[Value]) -> bool {
+        self.put_value_array_with_flags(values, 0, PutValueArrayFlags::empty())
+    }
+
+    /// Writes an array of values to this handle using `vpi_put_value_array`.
+    ///
+    /// `start_index` selects the first array element to update.
+    /// Returns `false` for null handles or unsupported/mixed value slices.
+    #[must_use]
+    #[cfg(feature = "value_array")]
+    pub fn put_value_array_with_flags(
+        &self,
+        values: &[Value],
+        start_index: i32,
+        flags: PutValueArrayFlags,
+    ) -> bool {
+        if self.is_null() {
+            return false;
+        }
+
+        if values.is_empty() {
+            return true;
+        }
+
+        let Some(mut payload) = encode_value_array_for_put(values, flags) else {
+            return false;
+        };
+
+        let Ok(num) = vpi_sys::PLI_UINT32::try_from(values.len()) else {
+            return false;
+        };
+
+        let mut index = start_index;
+        unsafe {
+            vpi_sys::vpi_put_value_array(self.as_raw(), &raw mut payload.raw, &raw mut index, num);
+        }
+        true
+    }
+
+    /// Writes an array of values to this handle.
+    ///
+    /// This fallback implementation is used when the `put_value_array`
+    /// feature is disabled and applies each value element-by-element using
+    /// [`Handle::put_value`] on `handle_by_index(start_index + i)`.
+    /// Returns `false` for null handles or when any indexed element is
+    /// unavailable.
+    #[must_use]
+    #[cfg(not(feature = "value_array"))]
+    pub fn put_value_array(&self, values: &[Value]) -> bool {
+        self.put_value_array_with_flags(values, 0, PutValueArrayFlags::empty())
+    }
+
+    /// Writes an array of values to this handle.
+    ///
+    /// This fallback implementation is used when the `put_value_array`
+    /// feature is disabled and applies each value element-by-element using
+    /// [`Handle::put_value`] on `handle_by_index(start_index + i)`.
+    ///
+    /// `start_index` selects the first array element to update.
+    ///
+    /// Note: `flags` are accepted for API compatibility but are ignored by
+    /// this fallback path.
+    ///
+    /// Returns `false` for null handles, out-of-range indices, or arithmetic
+    /// overflow while advancing indices.
+    #[must_use]
+    #[cfg(not(feature = "value_array"))]
+    pub fn put_value_array_with_flags(
+        &self,
+        values: &[Value],
+        start_index: i32,
+        flags: PutValueArrayFlags,
+    ) -> bool {
+        if self.is_null() {
+            return false;
+        }
+
+        let _ = flags;
+
+        for (offset, value) in values.iter().enumerate() {
+            let Ok(offset) = i32::try_from(offset) else {
+                return false;
+            };
+            let Some(index) = start_index.checked_add(offset) else {
+                return false;
+            };
+
+            let element = self.handle_by_index(index);
+            if element.is_null() {
+                return false;
+            }
+
+            let _ = element.put_value(value);
+        }
+
+        true
+    }
+
     /// Reads a value from this handle in the requested format.
     ///
     /// If `format` is [`ValueType::ObjType`], the simulator may override the
@@ -914,6 +1175,7 @@ impl Handle {
     /// }
     /// ```
     #[must_use]
+    #[cfg(feature = "value_array")]
     pub fn get_value_array(&self, format: ValueType) -> Option<Vec<Value>> {
         if self.is_null() {
             return None;
@@ -943,7 +1205,7 @@ impl Handle {
                         self.as_raw(),
                         &raw mut arrayvalue,
                         &raw mut index,
-                        size as PLI_UINT32,
+                        size as vpi_sys::PLI_UINT32,
                     );
                 }
 
@@ -965,7 +1227,7 @@ impl Handle {
                         self.as_raw(),
                         &raw mut arrayvalue,
                         &raw mut index,
-                        size as PLI_UINT32,
+                        size as vpi_sys::PLI_UINT32,
                     );
                 }
 
@@ -995,7 +1257,7 @@ impl Handle {
                         self.as_raw(),
                         &raw mut arrayvalue,
                         &raw mut index,
-                        size as PLI_UINT32,
+                        size as vpi_sys::PLI_UINT32,
                     );
                 }
 
@@ -1030,7 +1292,7 @@ impl Handle {
                         self.as_raw(),
                         &raw mut arrayvalue,
                         &raw mut index,
-                        size as PLI_UINT32,
+                        size as vpi_sys::PLI_UINT32,
                     );
                 }
 
@@ -1057,7 +1319,7 @@ impl Handle {
                         self.as_raw(),
                         &raw mut arrayvalue,
                         &raw mut index,
-                        size as PLI_UINT32,
+                        size as vpi_sys::PLI_UINT32,
                     );
                 }
 
@@ -1084,7 +1346,7 @@ impl Handle {
                         self.as_raw(),
                         &raw mut arrayvalue,
                         &raw mut index,
-                        size as PLI_UINT32,
+                        size as vpi_sys::PLI_UINT32,
                     );
                 }
 
@@ -1123,7 +1385,7 @@ impl Handle {
                         self.as_raw(),
                         &raw mut arrayvalue,
                         &raw mut index,
-                        size as PLI_UINT32,
+                        size as vpi_sys::PLI_UINT32,
                     );
                 }
 
@@ -1141,6 +1403,42 @@ impl Handle {
         }
     }
 
+    /// Retrieve an array of values by reading each indexed element.
+    ///
+    /// This fallback implementation is used when the `value_array` feature is
+    /// disabled. It resolves each element with `handle_by_index(i)` and reads
+    /// it using [`Handle::get_value`].
+    ///
+    /// Returns `None` if the base handle is null, if the object size is not
+    /// available, or if any element cannot be resolved/read.
+    #[must_use]
+    #[cfg(not(feature = "value_array"))]
+    pub fn get_value_array(&self, format: ValueType) -> Option<Vec<Value>> {
+        if self.is_null() {
+            return None;
+        }
+
+        let raw_size = unsafe { vpi_sys::vpi_get(vpi_sys::vpiSize as PLI_INT32, self.as_raw()) };
+        let size = usize::try_from(raw_size).ok()?;
+
+        let mut values = Vec::with_capacity(size);
+        for index in 0..size {
+            let Ok(index) = i32::try_from(index) else {
+                return None;
+            };
+
+            let element = self.handle_by_index(index);
+            if element.is_null() {
+                return None;
+            }
+
+            let value = element.get_value(format)?;
+            values.push(value);
+        }
+
+        Some(values)
+    }
+
     /// Returns whether this handle represents an array object.
     #[must_use]
     pub fn is_array(&self) -> bool {
@@ -1151,30 +1449,14 @@ impl Handle {
     }
 }
 
-#[cfg(all(
-    test,
-    any(
-        not(any(target_os = "windows", target_os = "macos")),
-        not(feature = "dynamic")
-    )
-))]
-#[unsafe(no_mangle)]
-unsafe extern "C" fn vpi_put_value(
-    _object: vpi_sys::vpiHandle,
-    _value_p: vpi_sys::p_vpi_value,
-    _time_p: vpi_sys::p_vpi_time,
-    _flags: vpi_sys::PLI_INT32,
-) -> vpi_sys::vpiHandle {
-    std::ptr::null_mut()
-}
-
 #[cfg(test)]
 mod tests {
     use super::{
         cstring_lossy_no_nul, encode_value_for_put, int64_to_scalar_vector, scalar_to_ab_bits,
         scalar_vector_to_int64, scalar_vector_to_string, scalar_vector_to_uint64,
         scalar_vector_to_vecval, string_to_scalar_vector, uint64_to_scalar_vector,
-        vector_value_to_scalar_vector, PutValueDelay, PutValueFlags, ScalarValue, Value, ValueType,
+        vector_value_to_scalar_vector, PutValueArrayFlags, PutValueDelay, PutValueFlags,
+        ScalarValue, Value, ValueType,
     };
     use crate::{Handle, Strength, StrengthValue, Time};
 
@@ -1275,6 +1557,18 @@ mod tests {
         let h = Handle::null();
         let event = h.put_int_value(7);
         assert!(event.is_null());
+    }
+
+    #[test]
+    fn put_value_array_flags_empty_is_zero() {
+        assert_eq!(PutValueArrayFlags::empty().bits(), 0);
+    }
+
+    #[test]
+    #[cfg(not(feature = "value_array"))]
+    fn get_value_array_on_null_handle_returns_none() {
+        let h = Handle::null();
+        assert!(h.get_value_array(ValueType::Int).is_none());
     }
 
     #[test]

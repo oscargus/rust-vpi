@@ -11,8 +11,8 @@ if ! command -v rg >/dev/null 2>&1; then
 fi
 
 used_symbols="$({
-  # Match both direct `vpi_sys::vpi_*` and formatted variants split by whitespace/newlines.
-  rg -No --pcre2 -U --no-line-number --no-filename 'vpi_sys::\s*(vpi_[A-Za-z0-9_]+)' vpi/src -r '$1'
+  # Match direct calls like `vpi_sys::vpi_*(`, allowing formatting/newlines between tokens.
+  rg -No --pcre2 -U --no-line-number --no-filename 'vpi_sys::\s*(vpi_[A-Za-z0-9_]+)\s*\(' vpi/src -r '$1'
 } | sort -u)"
 
 forwarded_symbols="$({
