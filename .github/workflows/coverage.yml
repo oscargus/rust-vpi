@@ -75,11 +75,21 @@ jobs:
           name: vpi-coverage-html
           path: coverage-html
 
+      - name: Prepare GitHub Pages site
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf pages-site
+          mkdir -p pages-site/coverage-html
+          cp -R coverage-html/. pages-site/coverage-html/
+          cp .github/pages/index.html pages-site/index.html
+
       - name: Upload GitHub Pages artifact
         if: github.event_name == 'push' && github.ref == 'refs/heads/master'
         uses: actions/upload-pages-artifact@v3
         with:
-          path: coverage-html
+          path: pages-site
 
   deploy-coverage-pages:
     name: Deploy Coverage Pages

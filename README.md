@@ -15,4 +15,12 @@ vpi-sys is a simple bindgen-wrapper that automatically generates Rust-bindings.
 
 There are examples in `test_example` to see how the crate can be used.
 
+Coverage reports are published from the dedicated coverage workflow:
+
+- GitHub Pages: https://oscargus.github.io/rust-vpi/
+
+For more details about what the safe `vpi` crate currently wraps from
+`vpi_user.h` / `sv_vpi_user.h`, and which lower-level areas still require
+`vpi-sys`, see [vpi/README.md](vpi/README.md).
+
 Both crates are licensed under the MIT license. However, I do not claim any license for the .h-files in vpi-sys, which are based on the IEEE 1800 standard.
