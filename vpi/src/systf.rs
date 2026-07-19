@@ -245,16 +245,17 @@ pub fn get_systf_arg(index: u32, format: ValueType) -> Option<Value> {
 /// - `None` when called outside a `calltf` context, when the argument is
 ///   missing, or when value retrieval fails.
 #[must_use]
-pub fn get_systf_args(formats: &[ValueType]) -> Vec<Option<Value>> {
+pub fn get_systf_args(formats: impl AsRef<[ValueType]>) -> Vec<Option<Value>> {
     let call = current_systf_call();
     if call.is_null() {
         return std::iter::repeat_with(|| None)
-            .take(formats.len())
+            .take(formats.as_ref().len())
             .collect();
     }
 
     let mut args = call.iterator(ObjectType::Argument);
     formats
+        .as_ref()
         .iter()
         .map(|format| args.next().and_then(|arg| arg.get_value(*format)))
         .collect()
