@@ -81,8 +81,8 @@ jobs:
         run: |
           set -euo pipefail
           rm -rf pages-site
-          mkdir -p pages-site/coverage-html
-          cp -R coverage-html/. pages-site/coverage-html/
+          mkdir -p pages-site/coverage
+          cp -R coverage-html/. pages-site/coverage/
           cp .github/pages/index.html pages-site/index.html
 
       - name: Upload GitHub Pages artifact

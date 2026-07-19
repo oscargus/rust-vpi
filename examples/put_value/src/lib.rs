@@ -10,9 +10,11 @@ startup_routines!(put_value_startup);
 const BIT_IN: &str = "put_value_dut.bit_in";
 const VEC_IN: &str = "put_value_dut.vec_in";
 const INT_IN: &str = "put_value_dut.int_in";
+const INT_ARR_IN: &str = "put_value_dut.int_arr_in";
 const BIT_OUT: &str = "put_value_dut.bit_out";
 const VEC_OUT: &str = "put_value_dut.vec_out";
 const INT_OUT: &str = "put_value_dut.int_out";
+const INT_ARR_OUT: &str = "put_value_dut.int_arr_out";
 const ARR_IN_0: &str = "put_value_dut.arr_in[0]";
 const ARR_IN_1: &str = "put_value_dut.arr_in[1]";
 const ARR_OUT_0: &str = "put_value_dut.arr_out[0]";
@@ -24,6 +26,7 @@ struct TestCase {
     bit_in: ScalarValue,
     vec_in: &'static str,
     int_in: i32,
+    int_arr_in: [i32; 2],
     arr_in: [&'static str; 2],
     verify_delay: u64,
     inter_test_delay: u64,
@@ -33,9 +36,11 @@ struct DutHandles {
     bit_in: Handle,
     vec_in: Handle,
     int_in: Handle,
+    int_arr_in: Handle,
     bit_out: Handle,
     vec_out: Handle,
     int_out: Handle,
+    int_arr_out: Handle,
     arr_in_0: Handle,
     arr_in_1: Handle,
     arr_out_0: Handle,
@@ -48,6 +53,7 @@ const TESTS: [TestCase; 5] = [
         bit_in: ScalarValue::One,
         vec_in: "10100101",
         int_in: 41,
+        int_arr_in: [41, -12],
         arr_in: ["10", "01"],
         verify_delay: 1,
         inter_test_delay: 2,
@@ -57,6 +63,7 @@ const TESTS: [TestCase; 5] = [
         bit_in: ScalarValue::Zero,
         vec_in: "00000000",
         int_in: 0,
+        int_arr_in: [0, 0],
         arr_in: ["00", "00"],
         verify_delay: 2,
         inter_test_delay: 3,
@@ -66,6 +73,7 @@ const TESTS: [TestCase; 5] = [
         bit_in: ScalarValue::One,
         vec_in: "00111100",
         int_in: -7,
+        int_arr_in: [-7, 1024],
         arr_in: ["11", "10"],
         verify_delay: 1,
         inter_test_delay: 2,
@@ -75,6 +83,7 @@ const TESTS: [TestCase; 5] = [
         bit_in: ScalarValue::Zero,
         vec_in: "11110000",
         int_in: 12345,
+        int_arr_in: [12345, -222],
         arr_in: ["01", "11"],
         verify_delay: 3,
         inter_test_delay: 1,
@@ -84,6 +93,7 @@ const TESTS: [TestCase; 5] = [
         bit_in: ScalarValue::One,
         vec_in: "XZHL10ZH",
         int_in: 99,
+        int_arr_in: [99, 7],
         arr_in: ["ZH", "XL"],
         verify_delay: 2,
         inter_test_delay: 1,
@@ -112,9 +122,11 @@ fn resolve_dut_handles() -> Option<DutHandles> {
         bit_in: Handle::handle_by_name(BIT_IN),
         vec_in: Handle::handle_by_name(VEC_IN),
         int_in: Handle::handle_by_name(INT_IN),
+        int_arr_in: Handle::handle_by_name(INT_ARR_IN),
         bit_out: Handle::handle_by_name(BIT_OUT),
         vec_out: Handle::handle_by_name(VEC_OUT),
         int_out: Handle::handle_by_name(INT_OUT),
+        int_arr_out: Handle::handle_by_name(INT_ARR_OUT),
         arr_in_0: Handle::handle_by_name(ARR_IN_0),
         arr_in_1: Handle::handle_by_name(ARR_IN_1),
         arr_out_0: Handle::handle_by_name(ARR_OUT_0),
@@ -125,9 +137,11 @@ fn resolve_dut_handles() -> Option<DutHandles> {
         handles.bit_in.is_null(),
         handles.vec_in.is_null(),
         handles.int_in.is_null(),
+        handles.int_arr_in.is_null(),
         handles.bit_out.is_null(),
         handles.vec_out.is_null(),
         handles.int_out.is_null(),
+        handles.int_arr_out.is_null(),
         handles.arr_in_0.is_null(),
         handles.arr_in_1.is_null(),
         handles.arr_out_0.is_null(),
@@ -178,6 +192,16 @@ fn inverted_scalar_string(bits: &str) -> Option<String> {
         .map(invert_binary_scalar)
         .collect();
     Some(scalar_vector_to_string(&values))
+}
+
+fn int_array_values(values: Vec<Value>) -> Option<Vec<i32>> {
+    values
+        .into_iter()
+        .map(|value| match value {
+            Value::Int(integer) => Some(integer),
+            _ => None,
+        })
+        .collect()
 }
 
 fn run_next_test(_cb_data: &CbData) {
@@ -237,6 +261,15 @@ fn run_next_test(_cb_data: &CbData) {
     let _ = handles.bit_in.put_value(&Value::Scalar(test.bit_in));
     let _ = handles.vec_in.put_value(&Value::Vector(vec_in_values));
     let _ = handles.int_in.put_value(&Value::Int(test.int_in));
+    if !handles
+        .int_arr_in
+        .put_value_array(&test.int_arr_in.map(Value::Int))
+    {
+        vpi::printf!("ERROR [{}]: int_arr_in put_value_array failed", test.name);
+        HAD_FAILURE.store(true, Ordering::SeqCst);
+        control(Control::Finish);
+        return;
+    }
     let _ = handles.arr_in_0.put_value(&Value::Vector(arr_in_0_values));
     let _ = handles.arr_in_1.put_value(&Value::Vector(arr_in_1_values));
 
@@ -366,6 +399,29 @@ fn verify_current_test(_cb_data: &CbData) {
         }
     }
 
+    match handles.int_arr_in.get_value_array(ValueType::Int) {
+        Some(values) => match int_array_values(values) {
+            Some(values) if values == test.int_arr_in => {}
+            Some(values) => {
+                ok = false;
+                vpi::printf!(
+                    "ERROR [{}]: int_arr_in expected {:?}, got {:?}",
+                    test.name,
+                    test.int_arr_in,
+                    values
+                );
+            }
+            None => {
+                ok = false;
+                vpi::printf!("ERROR [{}]: int_arr_in returned non-int values", test.name);
+            }
+        },
+        None => {
+            ok = false;
+            vpi::printf!("ERROR [{}]: int_arr_in get_value_array failed", test.name);
+        }
+    }
+
     let expected_bit_out = invert_binary_scalar(test.bit_in);
     match handles.bit_out.get_value(ValueType::Scalar) {
         Some(Value::Scalar(v)) if v == expected_bit_out => {}
@@ -466,6 +522,30 @@ fn verify_current_test(_cb_data: &CbData) {
                 expected_int_out,
                 other
             );
+        }
+    }
+
+    let expected_int_arr_out = test.int_arr_in.map(|value| value + 1);
+    match handles.int_arr_out.get_value_array(ValueType::Int) {
+        Some(values) => match int_array_values(values) {
+            Some(values) if values == expected_int_arr_out => {}
+            Some(values) => {
+                ok = false;
+                vpi::printf!(
+                    "ERROR [{}]: int_arr_out expected {:?}, got {:?}",
+                    test.name,
+                    expected_int_arr_out,
+                    values
+                );
+            }
+            None => {
+                ok = false;
+                vpi::printf!("ERROR [{}]: int_arr_out returned non-int values", test.name);
+            }
+        },
+        None => {
+            ok = false;
+            vpi::printf!("ERROR [{}]: int_arr_out get_value_array failed", test.name);
         }
     }
 
