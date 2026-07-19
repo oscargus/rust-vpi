@@ -133,7 +133,8 @@ impl Handle {
     /// when `indices` is empty, when the index count exceeds VPI limits, or
     /// when no object exists at the requested index tuple.
     #[must_use]
-    pub fn handle_by_multi_index(&self, indices: &[i32]) -> Self {
+    pub fn handle_by_multi_index(&self, indices: impl AsRef<[i32]>) -> Self {
+        let indices = indices.as_ref();
         if self.is_null() || indices.is_empty() {
             return Self::null();
         }
@@ -157,7 +158,7 @@ impl Handle {
     /// First traverses to `typ` via `vpi_handle`, then resolves a
     /// multidimensional element with `vpi_handle_by_multi_index`.
     #[must_use]
-    pub fn multi_handle_traversal(&self, typ: ObjectType, indices: &[i32]) -> Self {
+    pub fn multi_handle_traversal(&self, typ: ObjectType, indices: impl AsRef<[i32]>) -> Self {
         self.get(typ).handle_by_multi_index(indices)
     }
 }

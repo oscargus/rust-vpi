@@ -64,13 +64,7 @@ impl Display for Value {
             Value::Int(i) => write!(f, "{i}"),
             Value::Real(r) => write!(f, "{r}"),
             Value::String(s) => write!(f, "\"{s}\""),
-            Value::Vector(vec) => {
-                write!(
-                    f,
-                    "{}",
-                    vec.iter().map(|s| format!("{s}")).collect::<String>()
-                )
-            }
+            Value::Vector(vec) => write!(f, "{}", scalar_vector_to_string(vec)),
             Value::Strength(strength) => write!(f, "{strength}"),
             Value::Time(time) => write!(f, "{time}"),
             Value::ObjType(obj_type) => write!(f, "ObjType({obj_type})"), // Placeholder
@@ -87,13 +81,7 @@ impl Display for Value {
                         .collect::<String>()
                 )
             }
-            Value::RawFourState(vec) => {
-                write!(
-                    f,
-                    "{}",
-                    vec.iter().map(|s| format!("{s}")).collect::<String>()
-                )
-            }
+            Value::RawFourState(vec) => write!(f, "{}", scalar_vector_to_string(vec)),
         }
     }
 }
@@ -333,7 +321,8 @@ fn scalar_to_ab_bits(value: ScalarValue) -> (i32, i32) {
     }
 }
 
-fn scalar_vector_to_vecval(bits: &[ScalarValue]) -> Vec<vpi_sys::t_vpi_vecval> {
+fn scalar_vector_to_vecval(bits: impl AsRef<[ScalarValue]>) -> Vec<vpi_sys::t_vpi_vecval> {
+    let bits = bits.as_ref();
     let word_count = bits.len().div_ceil(32);
     let mut vecvals = vec![vpi_sys::t_vpi_vecval { aval: 0, bval: 0 }; word_count.max(1)];
 
@@ -507,9 +496,10 @@ fn encode_value_for_put(value: &Value) -> PutValuePayload {
 
 #[cfg(feature = "value_array")]
 fn encode_value_array_for_put(
-    values: &[Value],
+    values: impl AsRef<[Value]>,
     flags: PutValueArrayFlags,
 ) -> Option<PutValueArrayPayload> {
+    let values = values.as_ref();
     let mut payload = PutValueArrayPayload {
         raw: vpi_sys::t_vpi_arrayvalue {
             format: 0,
@@ -790,6 +780,358 @@ pub(crate) fn decode_vpi_value(
     }
 }
 
+/// Demote a homogeneous [`Value`] array to [`String`] values.
+///
+/// Supported `format` values are [`ValueType::BinStr`], [`ValueType::OctStr`],
+/// [`ValueType::HexStr`], [`ValueType::DecStr`], [`ValueType::String`],
+/// [`ValueType::Vector`], [`ValueType::RawTwoState`], and
+/// [`ValueType::RawFourState`].
+///
+/// Returns `None` when `format` is not string-backed or when any entry does
+/// not match the requested `format` variant.
+#[must_use]
+pub fn value_array_to_string_array(
+    values: impl AsRef<[Value]>,
+    format: ValueType,
+) -> Option<Vec<String>> {
+    let values = values.as_ref();
+    match format {
+        ValueType::BinStr => values
+            .iter()
+            .map(|value| match value {
+                Value::BinStr(s) => Some(s.clone()),
+                _ => None,
+            })
+            .collect(),
+        ValueType::OctStr => values
+            .iter()
+            .map(|value| match value {
+                Value::OctStr(s) => Some(s.clone()),
+                _ => None,
+            })
+            .collect(),
+        ValueType::HexStr => values
+            .iter()
+            .map(|value| match value {
+                Value::HexStr(s) => Some(s.clone()),
+                _ => None,
+            })
+            .collect(),
+        ValueType::DecStr => values
+            .iter()
+            .map(|value| match value {
+                Value::DecStr(s) => Some(s.clone()),
+                _ => None,
+            })
+            .collect(),
+        ValueType::String => values
+            .iter()
+            .map(|value| match value {
+                Value::String(s) => Some(s.clone()),
+                _ => None,
+            })
+            .collect(),
+        ValueType::Vector => values
+            .iter()
+            .map(|value| match value {
+                Value::Vector(_) => Some(value.to_string()),
+                _ => None,
+            })
+            .collect(),
+        ValueType::RawTwoState => values
+            .iter()
+            .map(|value| match value {
+                Value::RawTwoState(_) => Some(value.to_string()),
+                _ => None,
+            })
+            .collect(),
+        ValueType::RawFourState => values
+            .iter()
+            .map(|value| match value {
+                Value::RawFourState(_) => Some(value.to_string()),
+                _ => None,
+            })
+            .collect(),
+        _ => None,
+    }
+}
+
+/// Demote a homogeneous [`Value`] array to `i32` values.
+///
+/// Every element must be [`Value::Int`]. Returns `None` if any element has a
+/// different variant.
+#[must_use]
+pub fn value_array_to_int_array(values: impl AsRef<[Value]>) -> Option<Vec<i32>> {
+    let values = values.as_ref();
+
+    values
+        .iter()
+        .map(|value| match value {
+            Value::Int(v) => Some(*v),
+            _ => None,
+        })
+        .collect()
+}
+
+/// Demote a homogeneous [`Value`] array to `i16` values.
+///
+/// Every element must be [`Value::ShortInt`]. Returns `None` if any element
+/// has a different variant.
+#[must_use]
+pub fn value_array_to_shortint_array(values: impl AsRef<[Value]>) -> Option<Vec<i16>> {
+    let values = values.as_ref();
+
+    values
+        .iter()
+        .map(|value| match value {
+            Value::ShortInt(v) => Some(*v),
+            _ => None,
+        })
+        .collect()
+}
+
+/// Demote a homogeneous [`Value`] array to `i64` values.
+///
+/// Every element must be [`Value::LongInt`]. Returns `None` if any element has
+/// a different variant.
+#[must_use]
+pub fn value_array_to_longint_array(values: impl AsRef<[Value]>) -> Option<Vec<i64>> {
+    let values = values.as_ref();
+
+    values
+        .iter()
+        .map(|value| match value {
+            Value::LongInt(v) => Some(*v),
+            _ => None,
+        })
+        .collect()
+}
+
+/// Demote a homogeneous [`Value`] array to `f64` values.
+///
+/// Every element must be [`Value::Real`]. Returns `None` if any element has a
+/// different variant.
+#[must_use]
+pub fn value_array_to_real_array(values: impl AsRef<[Value]>) -> Option<Vec<f64>> {
+    let values = values.as_ref();
+
+    values
+        .iter()
+        .map(|value| match value {
+            Value::Real(v) => Some(*v),
+            _ => None,
+        })
+        .collect()
+}
+
+/// Demote a homogeneous [`Value`] array to `f32` values.
+///
+/// Every element must be [`Value::ShortReal`]. Returns `None` if any element
+/// has a different variant.
+#[must_use]
+pub fn value_array_to_shortreal_array(values: impl AsRef<[Value]>) -> Option<Vec<f32>> {
+    let values = values.as_ref();
+
+    values
+        .iter()
+        .map(|value| match value {
+            Value::ShortReal(v) => Some(*v),
+            _ => None,
+        })
+        .collect()
+}
+
+/// Demote a homogeneous [`Value`] array to scalar values.
+///
+/// Every element must be [`Value::Scalar`]. Returns `None` if any element has
+/// a different variant.
+#[must_use]
+pub fn value_array_to_scalar_array(values: impl AsRef<[Value]>) -> Option<Vec<ScalarValue>> {
+    let values = values.as_ref();
+
+    values
+        .iter()
+        .map(|value| match value {
+            Value::Scalar(v) => Some(*v),
+            _ => None,
+        })
+        .collect()
+}
+
+/// Demote a homogeneous [`Value`] array to time values.
+///
+/// Every element must be [`Value::Time`]. Returns `None` if any element has a
+/// different variant.
+#[must_use]
+pub fn value_array_to_time_array(values: impl AsRef<[Value]>) -> Option<Vec<Time>> {
+    let values = values.as_ref();
+
+    values
+        .iter()
+        .map(|value| match value {
+            Value::Time(v) => Some(v.clone()),
+            _ => None,
+        })
+        .collect()
+}
+
+/// Demote a homogeneous [`Value`] array to strength values.
+///
+/// Every element must be [`Value::Strength`]. Returns `None` if any element
+/// has a different variant.
+#[must_use]
+pub fn value_array_to_strength_array(values: impl AsRef<[Value]>) -> Option<Vec<StrengthValue>> {
+    let values = values.as_ref();
+
+    values
+        .iter()
+        .map(|value| match value {
+            Value::Strength(v) => Some(v.clone()),
+            _ => None,
+        })
+        .collect()
+}
+
+/// Promote a [`String`] array to a homogeneous [`Value`] array.
+///
+/// Supported `format` values are [`ValueType::BinStr`], [`ValueType::OctStr`],
+/// [`ValueType::HexStr`], [`ValueType::DecStr`], [`ValueType::String`],
+/// [`ValueType::Vector`], [`ValueType::RawTwoState`], and
+/// [`ValueType::RawFourState`].
+///
+/// The produced variant is determined by `format`:
+/// - [`ValueType::BinStr`] -> [`Value::BinStr`]
+/// - [`ValueType::OctStr`] -> [`Value::OctStr`]
+/// - [`ValueType::HexStr`] -> [`Value::HexStr`]
+/// - [`ValueType::DecStr`] -> [`Value::DecStr`]
+/// - [`ValueType::String`] -> [`Value::String`]
+/// - [`ValueType::Vector`] -> [`Value::Vector`] (parsed via [`string_to_scalar_vector`])
+/// - [`ValueType::RawTwoState`] -> [`Value::RawTwoState`] (`0`/`1` only)
+/// - [`ValueType::RawFourState`] -> [`Value::RawFourState`] (parsed via [`string_to_scalar_vector`])
+///
+/// Returns `None` when `format` is not string-backed.
+#[must_use]
+pub fn string_array_to_value_array(
+    values: impl AsRef<[String]>,
+    format: ValueType,
+) -> Option<Vec<Value>> {
+    let values = values.as_ref();
+    match format {
+        ValueType::BinStr => Some(values.iter().cloned().map(Value::BinStr).collect()),
+        ValueType::OctStr => Some(values.iter().cloned().map(Value::OctStr).collect()),
+        ValueType::HexStr => Some(values.iter().cloned().map(Value::HexStr).collect()),
+        ValueType::DecStr => Some(values.iter().cloned().map(Value::DecStr).collect()),
+        ValueType::String => Some(values.iter().cloned().map(Value::String).collect()),
+        ValueType::Vector => values
+            .iter()
+            .map(|value| string_to_scalar_vector(value).map(Value::Vector))
+            .collect(),
+        ValueType::RawTwoState => values
+            .iter()
+            .map(|value| {
+                value
+                    .chars()
+                    .map(|c| match c {
+                        '0' => Some(false),
+                        '1' => Some(true),
+                        _ => None,
+                    })
+                    .collect::<Option<Vec<bool>>>()
+                    .map(Value::RawTwoState)
+            })
+            .collect(),
+        ValueType::RawFourState => values
+            .iter()
+            .map(|value| string_to_scalar_vector(value).map(Value::RawFourState))
+            .collect(),
+        _ => None,
+    }
+}
+
+/// Promote an `i32` array to a homogeneous [`Value`] array.
+///
+/// Produces [`Value::Int`] for each element.
+#[must_use]
+pub fn int_array_to_value_array(values: impl AsRef<[i32]>) -> Vec<Value> {
+    values.as_ref().iter().copied().map(Value::Int).collect()
+}
+
+/// Promote an `i16` array to a homogeneous [`Value`] array.
+///
+/// Produces [`Value::ShortInt`] for each element.
+#[must_use]
+pub fn shortint_array_to_value_array(values: impl AsRef<[i16]>) -> Vec<Value> {
+    values
+        .as_ref()
+        .iter()
+        .copied()
+        .map(Value::ShortInt)
+        .collect()
+}
+
+/// Promote an `i64` array to a homogeneous [`Value`] array.
+///
+/// Produces [`Value::LongInt`] for each element.
+#[must_use]
+pub fn longint_array_to_value_array(values: impl AsRef<[i64]>) -> Vec<Value> {
+    values
+        .as_ref()
+        .iter()
+        .copied()
+        .map(Value::LongInt)
+        .collect()
+}
+
+/// Promote an `f64` array to a homogeneous [`Value`] array.
+///
+/// Produces [`Value::Real`] for each element.
+#[must_use]
+pub fn real_array_to_value_array(values: impl AsRef<[f64]>) -> Vec<Value> {
+    values.as_ref().iter().copied().map(Value::Real).collect()
+}
+
+/// Promote an `f32` array to a homogeneous [`Value`] array.
+///
+/// Produces [`Value::ShortReal`] for each element.
+#[must_use]
+pub fn shortreal_array_to_value_array(values: impl AsRef<[f32]>) -> Vec<Value> {
+    values
+        .as_ref()
+        .iter()
+        .copied()
+        .map(Value::ShortReal)
+        .collect()
+}
+
+/// Promote a scalar array to a homogeneous [`Value`] array.
+///
+/// Produces [`Value::Scalar`] for each element.
+#[must_use]
+pub fn scalar_array_to_value_array(values: impl AsRef<[ScalarValue]>) -> Vec<Value> {
+    values.as_ref().iter().copied().map(Value::Scalar).collect()
+}
+
+/// Promote a time array to a homogeneous [`Value`] array.
+///
+/// Produces [`Value::Time`] for each element.
+#[must_use]
+pub fn time_array_to_value_array(values: impl AsRef<[Time]>) -> Vec<Value> {
+    values.as_ref().iter().cloned().map(Value::Time).collect()
+}
+
+/// Promote a strength array to a homogeneous [`Value`] array.
+///
+/// Produces [`Value::Strength`] for each element.
+#[must_use]
+pub fn strength_array_to_value_array(values: impl AsRef<[StrengthValue]>) -> Vec<Value> {
+    values
+        .as_ref()
+        .iter()
+        .cloned()
+        .map(Value::Strength)
+        .collect()
+}
+
 /// Convert a binary-encoded [`ScalarValue`] slice (MSB at index 0) to a [`num_bigint::BigUint`].
 ///
 /// Returns `None` if any element is not a definite binary value
@@ -797,9 +1139,9 @@ pub(crate) fn decode_vpi_value(
 /// Any `X`, `Z`, `H`, `L`, or `DontCare` bit causes `None` to be returned.
 #[cfg(feature = "bigint")]
 #[must_use]
-pub fn scalar_vector_to_biguint(bits: &[ScalarValue]) -> Option<num_bigint::BigUint> {
+pub fn scalar_vector_to_biguint(bits: impl AsRef<[ScalarValue]>) -> Option<num_bigint::BigUint> {
     let mut result = num_bigint::BigUint::ZERO;
-    for bit in bits {
+    for bit in bits.as_ref() {
         result <<= 1u32;
         match bit {
             ScalarValue::Zero => {}
@@ -836,7 +1178,8 @@ pub fn uint64_to_scalar_vector(value: u64, bits: usize) -> Vec<ScalarValue> {
 /// Any `X`, `Z`, `H`, `L`, or `DontCare` bit causes `None` to be
 /// returned.
 #[must_use]
-pub fn scalar_vector_to_uint64(bits: &[ScalarValue]) -> Option<u64> {
+pub fn scalar_vector_to_uint64(bits: impl AsRef<[ScalarValue]>) -> Option<u64> {
+    let bits = bits.as_ref();
     if bits.len() > 64 {
         return None;
     }
@@ -857,8 +1200,8 @@ pub fn scalar_vector_to_uint64(bits: &[ScalarValue]) -> Option<u64> {
 /// Each scalar is mapped to its Verilog-style character (`0`, `1`, `X`, `Z`,
 /// `H`, `L`, `-`) in order (MSB at index 0).
 #[must_use]
-pub fn scalar_vector_to_string(bits: &[ScalarValue]) -> String {
-    bits.iter().copied().map(char::from).collect()
+pub fn scalar_vector_to_string(bits: impl AsRef<[ScalarValue]>) -> String {
+    bits.as_ref().iter().copied().map(char::from).collect()
 }
 
 /// Convert a scalar string into a vector of scalar values.
@@ -919,7 +1262,8 @@ pub fn int64_to_scalar_vector(value: i64, bits: usize) -> Vec<ScalarValue> {
 /// [`ScalarValue::One`]). Any `X`, `Z`, `H`, `L`, or `DontCare`
 /// bit causes `None` to be returned.
 #[must_use]
-pub fn scalar_vector_to_int64(bits: &[ScalarValue]) -> Option<i64> {
+pub fn scalar_vector_to_int64(bits: impl AsRef<[ScalarValue]>) -> Option<i64> {
+    let bits = bits.as_ref();
     if bits.is_empty() || bits.len() > 64 {
         return None;
     }
@@ -958,7 +1302,8 @@ pub fn bigint_to_scalar_vector(value: &num_bigint::BigInt, bits: usize) -> Vec<S
 /// `H`, `L`, or `DontCare` bit causes `None` to be returned.
 #[cfg(feature = "bigint")]
 #[must_use]
-pub fn scalar_vector_to_bigint(bits: &[ScalarValue]) -> Option<num_bigint::BigInt> {
+pub fn scalar_vector_to_bigint(bits: impl AsRef<[ScalarValue]>) -> Option<num_bigint::BigInt> {
+    let bits = bits.as_ref();
     if bits.is_empty() {
         return None;
     }
@@ -1034,7 +1379,7 @@ impl Handle {
     /// Returns `false` for null handles or unsupported/mixed value slices.
     #[must_use]
     #[cfg(feature = "value_array")]
-    pub fn put_value_array(&self, values: &[Value]) -> bool {
+    pub fn put_value_array(&self, values: impl AsRef<[Value]>) -> bool {
         self.put_value_array_with_flags(values, 0, PutValueArrayFlags::empty())
     }
 
@@ -1046,14 +1391,14 @@ impl Handle {
     #[cfg(feature = "value_array")]
     pub fn put_value_array_with_flags(
         &self,
-        values: &[Value],
+        values: impl AsRef<[Value]>,
         start_index: i32,
         flags: PutValueArrayFlags,
     ) -> bool {
         if self.is_null() {
             return false;
         }
-
+        let values = values.as_ref();
         if values.is_empty() {
             return true;
         }
@@ -1082,7 +1427,7 @@ impl Handle {
     /// unavailable.
     #[must_use]
     #[cfg(not(feature = "value_array"))]
-    pub fn put_value_array(&self, values: &[Value]) -> bool {
+    pub fn put_value_array(&self, values: impl AsRef<[Value]>) -> bool {
         self.put_value_array_with_flags(values, 0, &PutValueArrayFlags::empty())
     }
 
@@ -1103,7 +1448,7 @@ impl Handle {
     #[cfg(not(feature = "value_array"))]
     pub fn put_value_array_with_flags(
         &self,
-        values: &[Value],
+        values: impl AsRef<[Value]>,
         start_index: i32,
         flags: &PutValueArrayFlags,
     ) -> bool {
@@ -1113,7 +1458,7 @@ impl Handle {
 
         let _ = flags;
 
-        for (offset, value) in values.iter().enumerate() {
+        for (offset, value) in values.as_ref().iter().enumerate() {
             let Ok(offset) = i32::try_from(offset) else {
                 return false;
             };
@@ -1454,9 +1799,11 @@ mod tests {
     use super::{
         cstring_lossy_no_nul, encode_value_for_put, int64_to_scalar_vector, scalar_to_ab_bits,
         scalar_vector_to_int64, scalar_vector_to_string, scalar_vector_to_uint64,
-        scalar_vector_to_vecval, string_to_scalar_vector, uint64_to_scalar_vector,
-        vector_value_to_scalar_vector, PutValueArrayFlags, PutValueDelay, PutValueFlags,
-        ScalarValue, Value, ValueType,
+        scalar_vector_to_vecval, strength_array_to_value_array, string_array_to_value_array,
+        string_to_scalar_vector, time_array_to_value_array, uint64_to_scalar_vector,
+        value_array_to_int_array, value_array_to_strength_array, value_array_to_string_array,
+        value_array_to_time_array, vector_value_to_scalar_vector, PutValueArrayFlags,
+        PutValueDelay, PutValueFlags, ScalarValue, Value, ValueType,
     };
     use crate::{Handle, Strength, StrengthValue, Time};
 
@@ -1618,6 +1965,225 @@ mod tests {
         let payload = encode_value_for_put(&Value::Time(Time::Sim(10)));
         assert_eq!(payload.raw.format, vpi_sys::vpiTimeVal as i32);
         assert!(payload._time.is_some());
+    }
+
+    #[test]
+    fn value_array_to_string_array_accepts_string_backed_formats() {
+        let values = vec![
+            Value::HexStr("AA".to_string()),
+            Value::HexStr("10".to_string()),
+        ];
+        let demoted = value_array_to_string_array(&values, ValueType::HexStr);
+        assert_eq!(demoted, Some(vec!["AA".to_string(), "10".to_string()]));
+    }
+
+    #[test]
+    fn value_array_to_string_array_rejects_non_string_format() {
+        let values = vec![Value::String("x".to_string())];
+        assert_eq!(value_array_to_string_array(&values, ValueType::Int), None);
+    }
+
+    #[test]
+    fn value_array_to_string_array_string_rejects_vector_variants() {
+        let vector_values = vec![Value::Vector(vec![ScalarValue::Zero, ScalarValue::One])];
+        assert_eq!(
+            value_array_to_string_array(&vector_values, ValueType::String),
+            None
+        );
+
+        let raw_two_state_values = vec![Value::RawTwoState(vec![true, false])];
+        assert_eq!(
+            value_array_to_string_array(&raw_two_state_values, ValueType::String),
+            None
+        );
+
+        let raw_four_state_values = vec![Value::RawFourState(vec![
+            ScalarValue::One,
+            ScalarValue::DontCare,
+        ])];
+        assert_eq!(
+            value_array_to_string_array(&raw_four_state_values, ValueType::String),
+            None
+        );
+    }
+
+    #[test]
+    fn value_array_to_string_array_supports_vector_like_formats_directly() {
+        let vector_values = vec![Value::Vector(vec![
+            ScalarValue::Zero,
+            ScalarValue::One,
+            ScalarValue::X,
+            ScalarValue::Z,
+        ])];
+        assert_eq!(
+            value_array_to_string_array(&vector_values, ValueType::Vector),
+            Some(vec!["01XZ".to_string()])
+        );
+
+        let raw_two_state_values = vec![Value::RawTwoState(vec![true, false, true, true])];
+        assert_eq!(
+            value_array_to_string_array(&raw_two_state_values, ValueType::RawTwoState),
+            Some(vec!["1011".to_string()])
+        );
+
+        let raw_four_state_values = vec![Value::RawFourState(vec![
+            ScalarValue::One,
+            ScalarValue::Zero,
+            ScalarValue::DontCare,
+        ])];
+        assert_eq!(
+            value_array_to_string_array(&raw_four_state_values, ValueType::RawFourState),
+            Some(vec!["10-".to_string()])
+        );
+    }
+
+    #[test]
+    fn value_array_to_int_array_rejects_mixed_values() {
+        let values = vec![Value::Int(1), Value::ShortInt(2)];
+        assert_eq!(value_array_to_int_array(&values), None);
+    }
+
+    #[test]
+    fn value_array_to_time_array_demotes_time_values() {
+        let values = vec![
+            Value::Time(Time::Sim(5)),
+            Value::Time(Time::ScaledReal(2.5)),
+        ];
+        let demoted = value_array_to_time_array(&values);
+        assert_eq!(demoted, Some(vec![Time::Sim(5), Time::ScaledReal(2.5)]));
+    }
+
+    #[test]
+    fn value_array_to_strength_array_demotes_strength_values() {
+        let values = vec![
+            Value::Strength(StrengthValue::new(
+                ScalarValue::One,
+                Strength::StrongDrive,
+                Strength::HiZ,
+            )),
+            Value::Strength(StrengthValue::new(
+                ScalarValue::Zero,
+                Strength::PullDrive,
+                Strength::WeakDrive,
+            )),
+        ];
+
+        let demoted = value_array_to_strength_array(&values);
+        assert_eq!(
+            demoted,
+            Some(vec![
+                StrengthValue::new(ScalarValue::One, Strength::StrongDrive, Strength::HiZ),
+                StrengthValue::new(ScalarValue::Zero, Strength::PullDrive, Strength::WeakDrive),
+            ])
+        );
+    }
+
+    #[test]
+    fn value_array_to_strength_array_rejects_mixed_values() {
+        let values = vec![
+            Value::Strength(StrengthValue::new(
+                ScalarValue::One,
+                Strength::StrongDrive,
+                Strength::HiZ,
+            )),
+            Value::Int(3),
+        ];
+
+        assert_eq!(value_array_to_strength_array(&values), None);
+    }
+
+    #[test]
+    fn string_array_to_value_array_promotes_by_requested_format() {
+        let input = vec!["101".to_string(), "010".to_string()];
+        let promoted = string_array_to_value_array(&input, ValueType::BinStr);
+        assert_eq!(
+            promoted,
+            Some(vec![
+                Value::BinStr("101".to_string()),
+                Value::BinStr("010".to_string())
+            ])
+        );
+    }
+
+    #[test]
+    fn string_array_to_value_array_rejects_non_string_formats() {
+        let input = vec!["1".to_string()];
+        assert_eq!(string_array_to_value_array(&input, ValueType::Int), None);
+    }
+
+    #[test]
+    fn string_array_to_value_array_supports_vector_like_formats() {
+        let vector_input = vec!["01XZ-".to_string()];
+        assert_eq!(
+            string_array_to_value_array(&vector_input, ValueType::Vector),
+            Some(vec![Value::Vector(vec![
+                ScalarValue::Zero,
+                ScalarValue::One,
+                ScalarValue::X,
+                ScalarValue::Z,
+                ScalarValue::DontCare,
+            ])])
+        );
+
+        let raw_two_state_input = vec!["10110".to_string()];
+        assert_eq!(
+            string_array_to_value_array(&raw_two_state_input, ValueType::RawTwoState),
+            Some(vec![Value::RawTwoState(vec![
+                true, false, true, true, false
+            ])])
+        );
+
+        let raw_four_state_input = vec!["10-".to_string()];
+        assert_eq!(
+            string_array_to_value_array(&raw_four_state_input, ValueType::RawFourState),
+            Some(vec![Value::RawFourState(vec![
+                ScalarValue::One,
+                ScalarValue::Zero,
+                ScalarValue::DontCare,
+            ])])
+        );
+    }
+
+    #[test]
+    fn string_array_to_value_array_rejects_invalid_vector_like_strings() {
+        let bad_vector = vec!["01N".to_string()];
+        assert_eq!(
+            string_array_to_value_array(&bad_vector, ValueType::Vector),
+            None
+        );
+
+        let bad_raw_two_state = vec!["10X".to_string()];
+        assert_eq!(
+            string_array_to_value_array(&bad_raw_two_state, ValueType::RawTwoState),
+            None
+        );
+
+        let bad_raw_four_state = vec!["10?".to_string()];
+        assert_eq!(
+            string_array_to_value_array(&bad_raw_four_state, ValueType::RawFourState),
+            None
+        );
+    }
+
+    #[test]
+    fn time_array_to_value_array_round_trips_through_demotion() {
+        let times = vec![Time::Sim(12), Time::Suppress];
+        let promoted = time_array_to_value_array(&times);
+        let demoted = value_array_to_time_array(&promoted).expect("time demotion should succeed");
+        assert_eq!(demoted, times);
+    }
+
+    #[test]
+    fn strength_array_to_value_array_round_trips_through_demotion() {
+        let strengths = vec![
+            StrengthValue::new(ScalarValue::One, Strength::StrongDrive, Strength::HiZ),
+            StrengthValue::new(ScalarValue::Zero, Strength::PullDrive, Strength::WeakDrive),
+        ];
+
+        let promoted = strength_array_to_value_array(&strengths);
+        let demoted =
+            value_array_to_strength_array(&promoted).expect("strength demotion should succeed");
+        assert_eq!(demoted, strengths);
     }
 
     #[test]

@@ -1,8 +1,8 @@
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use vpi::{
     control, register_cb, register_cb_with_time, scalar_vector_to_string, startup_routines,
-    string_to_scalar_vector, CbData, CbReason, Control, Handle, ScalarValue, Time, Value,
-    ValueType,
+    string_to_scalar_vector, value_array_to_int_array, CbData, CbReason, Control, Handle,
+    ScalarValue, Time, Value, ValueType,
 };
 
 startup_routines!(put_value_startup);
@@ -194,16 +194,6 @@ fn inverted_scalar_string(bits: &str) -> Option<String> {
     Some(scalar_vector_to_string(&values))
 }
 
-fn int_array_values(values: Vec<Value>) -> Option<Vec<i32>> {
-    values
-        .into_iter()
-        .map(|value| match value {
-            Value::Int(integer) => Some(integer),
-            _ => None,
-        })
-        .collect()
-}
-
 fn run_next_test(_cb_data: &CbData) {
     let index = CURRENT_TEST_INDEX.load(Ordering::SeqCst);
 
@@ -261,10 +251,8 @@ fn run_next_test(_cb_data: &CbData) {
     let _ = handles.bit_in.put_value(&Value::Scalar(test.bit_in));
     let _ = handles.vec_in.put_value(&Value::Vector(vec_in_values));
     let _ = handles.int_in.put_value(&Value::Int(test.int_in));
-    if !handles
-        .int_arr_in
-        .put_value_array(&test.int_arr_in.map(Value::Int))
-    {
+    let int_arr_in_values = vpi::int_array_to_value_array(test.int_arr_in);
+    if !handles.int_arr_in.put_value_array(&int_arr_in_values) {
         vpi::printf!("ERROR [{}]: int_arr_in put_value_array failed", test.name);
         HAD_FAILURE.store(true, Ordering::SeqCst);
         control(Control::Finish);
@@ -400,7 +388,7 @@ fn verify_current_test(_cb_data: &CbData) {
     }
 
     if let Some(values) = handles.int_arr_in.get_value_array(ValueType::Int) {
-        match int_array_values(values) {
+        match value_array_to_int_array(&values) {
             Some(values) if values == test.int_arr_in => {}
             Some(values) => {
                 ok = false;
@@ -526,7 +514,7 @@ fn verify_current_test(_cb_data: &CbData) {
 
     let expected_int_arr_out = test.int_arr_in.map(|value| value + 1);
     if let Some(values) = handles.int_arr_out.get_value_array(ValueType::Int) {
-        match int_array_values(values) {
+        match value_array_to_int_array(&values) {
             Some(values) if values == expected_int_arr_out => {}
             Some(values) => {
                 ok = false;
