@@ -975,6 +975,24 @@ impl Handle {
         ConstType::from_u32(value as u32)
     }
 
+    #[must_use]
+    /// Returns this object's name, if available.
+    pub fn get_name(&self) -> Option<String> {
+        if self.is_null() {
+            return None;
+        }
+        self.get_str(Property::Name)
+    }
+
+    #[must_use]
+    /// Returns this object's full hierarchical name, if available.
+    pub fn get_full_name(&self) -> Option<String> {
+        if self.is_null() {
+            return None;
+        }
+        self.get_str(Property::FullName)
+    }
+
     /// Returns this object's function type, if available.
     #[must_use]
     pub fn get_func_type(&self) -> Option<FuncType> {

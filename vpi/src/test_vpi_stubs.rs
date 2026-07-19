@@ -27,7 +27,7 @@ unsafe extern "C" fn vpi_remove_cb(_cb_obj: vpi_sys::vpiHandle) -> vpi_sys::PLI_
 #[unsafe(no_mangle)]
 unsafe extern "C" fn vpi_handle(
     _type: vpi_sys::PLI_INT32,
-    _refHandle: vpi_sys::vpiHandle,
+    _ref_handle: vpi_sys::vpiHandle,
 ) -> vpi_sys::vpiHandle {
     std::ptr::null_mut()
 }
@@ -35,8 +35,8 @@ unsafe extern "C" fn vpi_handle(
 #[unsafe(no_mangle)]
 unsafe extern "C" fn vpi_handle_multi(
     _type: vpi_sys::PLI_INT32,
-    _refHandle1: vpi_sys::vpiHandle,
-    _refHandle2: vpi_sys::vpiHandle,
+    _ref_handle1: vpi_sys::vpiHandle,
+    _ref_handle2: vpi_sys::vpiHandle,
 ) -> vpi_sys::vpiHandle {
     std::ptr::null_mut()
 }
@@ -69,7 +69,7 @@ unsafe extern "C" fn vpi_handle_by_multi_index(
 #[unsafe(no_mangle)]
 unsafe extern "C" fn vpi_iterate(
     _type: vpi_sys::PLI_INT32,
-    _refHandle: vpi_sys::vpiHandle,
+    _ref_handle: vpi_sys::vpiHandle,
 ) -> vpi_sys::vpiHandle {
     std::ptr::null_mut()
 }
@@ -189,7 +189,7 @@ unsafe extern "C" fn vpi_put_value_array(
 }
 
 #[unsafe(no_mangle)]
-unsafe extern "C" fn vpi_mcd_open(_fileName: *mut vpi_sys::PLI_BYTE8) -> vpi_sys::PLI_UINT32 {
+unsafe extern "C" fn vpi_mcd_open(_file_name: *mut vpi_sys::PLI_BYTE8) -> vpi_sys::PLI_UINT32 {
     0
 }
 
