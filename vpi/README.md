@@ -40,7 +40,6 @@ The safe `vpi` crate covers the common plugin workflows in `vpi_user.h`:
 - systf registration and argument access
 - simulator control/time helpers
 - basic simulator and MCD output helpers
-- sv-gated constraint/randomization helpers
 
 Some lower-level `vpi_user.h` entry points are still only available through
 `vpi-sys`, notably:
@@ -57,10 +56,11 @@ Rust, let me know!
 SystemVerilog support from `sv_vpi_user.h` is also partial at the high-level
 API layer. The crate exposes many SV object and property constants through the
 generic `ObjectType` and `Property` enums, and it supports assertion
-callbacks, but it does not yet provide dedicated high-level helpers for several
+callbacks, as well as helpers for constraint/randomization structures and
+packages/interfaces/programs/virtual interfaces, but it does not yet provide
+dedicated high-level helpers for
 SV-specific modeling areas such as:
 
-- packages, interfaces, programs, and virtual interfaces
 - class/type-spec trees and type parameters
 - clocking blocks and clocking I/O
 - property/sequence AST-style traversal helpers

@@ -399,8 +399,8 @@ fn verify_current_test(_cb_data: &CbData) {
         }
     }
 
-    match handles.int_arr_in.get_value_array(ValueType::Int) {
-        Some(values) => match int_array_values(values) {
+    if let Some(values) = handles.int_arr_in.get_value_array(ValueType::Int) {
+        match int_array_values(values) {
             Some(values) if values == test.int_arr_in => {}
             Some(values) => {
                 ok = false;
@@ -415,11 +415,10 @@ fn verify_current_test(_cb_data: &CbData) {
                 ok = false;
                 vpi::printf!("ERROR [{}]: int_arr_in returned non-int values", test.name);
             }
-        },
-        None => {
-            ok = false;
-            vpi::printf!("ERROR [{}]: int_arr_in get_value_array failed", test.name);
         }
+    } else {
+        ok = false;
+        vpi::printf!("ERROR [{}]: int_arr_in get_value_array failed", test.name);
     }
 
     let expected_bit_out = invert_binary_scalar(test.bit_in);
@@ -526,8 +525,8 @@ fn verify_current_test(_cb_data: &CbData) {
     }
 
     let expected_int_arr_out = test.int_arr_in.map(|value| value + 1);
-    match handles.int_arr_out.get_value_array(ValueType::Int) {
-        Some(values) => match int_array_values(values) {
+    if let Some(values) = handles.int_arr_out.get_value_array(ValueType::Int) {
+        match int_array_values(values) {
             Some(values) if values == expected_int_arr_out => {}
             Some(values) => {
                 ok = false;
@@ -542,11 +541,10 @@ fn verify_current_test(_cb_data: &CbData) {
                 ok = false;
                 vpi::printf!("ERROR [{}]: int_arr_out returned non-int values", test.name);
             }
-        },
-        None => {
-            ok = false;
-            vpi::printf!("ERROR [{}]: int_arr_out get_value_array failed", test.name);
         }
+    } else {
+        ok = false;
+        vpi::printf!("ERROR [{}]: int_arr_out get_value_array failed", test.name);
     }
 
     if ok {

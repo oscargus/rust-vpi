@@ -1083,7 +1083,7 @@ impl Handle {
     #[must_use]
     #[cfg(not(feature = "value_array"))]
     pub fn put_value_array(&self, values: &[Value]) -> bool {
-        self.put_value_array_with_flags(values, 0, PutValueArrayFlags::empty())
+        self.put_value_array_with_flags(values, 0, &PutValueArrayFlags::empty())
     }
 
     /// Writes an array of values to this handle.
@@ -1105,7 +1105,7 @@ impl Handle {
         &self,
         values: &[Value],
         start_index: i32,
-        flags: PutValueArrayFlags,
+        flags: &PutValueArrayFlags,
     ) -> bool {
         if self.is_null() {
             return false;
@@ -1445,7 +1445,7 @@ impl Handle {
         if self.is_null() {
             return false;
         }
-        self.get_bool(Property::Array) == Some(true)
+        self.get_bool(Property::Array).unwrap_or(false)
     }
 }
 

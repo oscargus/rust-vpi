@@ -63,7 +63,6 @@ pub fn printf(msg: impl AsRef<str>) {
 /// Flushes the simulator's default output streams via `vpi_flush`.
 ///
 /// Returns `Ok(())` on success (`0`) and `Err(code)` otherwise.
-#[must_use]
 pub fn flush() -> Result<(), i32> {
     let code = unsafe { vpi_sys::vpi_flush() };
     if code == 0 {

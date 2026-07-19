@@ -196,7 +196,7 @@ pub enum Property {
     /// 609: local variable declarations
     LocalVarDecls = vpi_sys::vpiLocalVarDecls as i32,
     #[cfg(feature = "sv")]
-    /// 610: randomization type (rand, randc, not_rand)
+    /// 610: randomization type (rand, randc, `not_rand`)
     RandType = vpi_sys::vpiRandType as i32,
     #[cfg(feature = "sv")]
     /// 611: interface or modport port type
@@ -211,7 +211,7 @@ pub enum Property {
     /// 620: visibility of class member (public, protected, local)
     Visibility = vpi_sys::vpiVisibility as i32,
     #[cfg(feature = "sv")]
-    /// 624: always block type (always_comb, always_ff, always_latch)
+    /// 624: always block type (`always_comb`, `always_ff`, `always_latch`)
     AlwaysType = vpi_sys::vpiAlwaysType as i32,
     #[cfg(feature = "sv")]
     /// 625: distribution constraint type
@@ -662,7 +662,7 @@ pub enum OpType {
     /// 55: sequence intersection operator
     Intersect = vpi_sys::vpiIntersectOp,
     #[cfg(feature = "sv")]
-    /// 56: first_match operator
+    /// 56: `first_match` operator
     FirstMatch = vpi_sys::vpiFirstMatchOp,
     #[cfg(feature = "sv")]
     /// 57: throughout operator
@@ -743,22 +743,22 @@ pub enum OpType {
     /// 82: assignment operator
     Assignment = vpi_sys::vpiAssignmentOp,
     #[cfg(feature = "sv")]
-    /// 83: accept_on operator
+    /// 83: `accept_on` operator
     AcceptOn = vpi_sys::vpiAcceptOnOp,
     #[cfg(feature = "sv")]
-    /// 84: reject_on operator
+    /// 84: `reject_on` operator
     RejectOn = vpi_sys::vpiRejectOnOp,
     #[cfg(feature = "sv")]
-    /// 85: sync_accept_on operator
+    /// 85: `sync_accept_on` operator
     SyncAcceptOn = vpi_sys::vpiSyncAcceptOnOp,
     #[cfg(feature = "sv")]
-    /// 86: sync_reject_on operator
+    /// 86: `sync_reject_on` operator
     SyncRejectOn = vpi_sys::vpiSyncRejectOnOp,
     #[cfg(feature = "sv")]
-    /// 87: overlapped followed_by operator (|=>)
+    /// 87: overlapped `followed_by` operator (|=>)
     OverlapFollowedBy = vpi_sys::vpiOverlapFollowedByOp,
     #[cfg(feature = "sv")]
-    /// 88: non-overlapped followed_by operator (|->)
+    /// 88: non-overlapped `followed_by` operator (|->)
     NonOverlapFollowedBy = vpi_sys::vpiNonOverlapFollowedByOp,
     #[cfg(feature = "sv")]
     /// 89: nexttime operator
@@ -773,7 +773,7 @@ pub enum OpType {
     /// 92: until operator
     Until = vpi_sys::vpiUntilOp,
     #[cfg(feature = "sv")]
-    /// 93: until_with operator
+    /// 93: `until_with` operator
     UntilWith = vpi_sys::vpiUntilWithOp,
     #[cfg(feature = "sv")]
     /// 94: implies operator
@@ -1032,6 +1032,46 @@ impl Handle {
     }
 
     #[cfg(feature = "sv")]
+    /// Iterates packages visible from this scope/root.
+    #[must_use]
+    pub fn get_packages(&self) -> Vec<Handle> {
+        if self.is_null() {
+            return Vec::new();
+        }
+        self.iterator(ObjectType::Package).collect()
+    }
+
+    #[cfg(feature = "sv")]
+    /// Iterates interface instances visible from this scope/root.
+    #[must_use]
+    pub fn get_interfaces(&self) -> Vec<Handle> {
+        if self.is_null() {
+            return Vec::new();
+        }
+        self.iterator(ObjectType::Interface).collect()
+    }
+
+    #[cfg(feature = "sv")]
+    /// Iterates program instances visible from this scope/root.
+    #[must_use]
+    pub fn get_programs(&self) -> Vec<Handle> {
+        if self.is_null() {
+            return Vec::new();
+        }
+        self.iterator(ObjectType::Program).collect()
+    }
+
+    #[cfg(feature = "sv")]
+    /// Iterates virtual interface variables visible from this scope/root.
+    #[must_use]
+    pub fn get_virtual_interfaces(&self) -> Vec<Handle> {
+        if self.is_null() {
+            return Vec::new();
+        }
+        self.iterator(ObjectType::VirtualInterfaceVar).collect()
+    }
+
+    #[cfg(feature = "sv")]
     /// Returns whether this object participates in randomization.
     #[must_use]
     pub fn is_randomized(&self) -> Option<bool> {
@@ -1143,6 +1183,10 @@ mod tests {
     #[test]
     fn sv_constraint_helpers_on_null_handle_are_safe() {
         let h = Handle::null();
+        assert!(h.get_packages().is_empty());
+        assert!(h.get_interfaces().is_empty());
+        assert!(h.get_programs().is_empty());
+        assert!(h.get_virtual_interfaces().is_empty());
         assert_eq!(h.is_randomized(), None);
         assert_eq!(h.get_rand_type(), None);
         assert_eq!(h.is_constraint_enabled(), None);
