@@ -25,6 +25,7 @@ value_array = []
 dynamic = ["dep:vpi-shim"]
 bigint = ["dep:num-bigint"]
 sv = ["vpi-sys/sv", "vpi-shim?/sv"]
+verilator = []
 
 [target.'cfg(any(target_os = "windows", target_os = "macos"))'.dependencies]
 vpi-shim = { workspace = true, optional = true }

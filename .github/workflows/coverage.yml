@@ -60,6 +60,7 @@ jobs:
           bash test_scripts/run_timescale_test.sh
           bash test_scripts/run_systf_test.sh
           bash test_scripts/run_put_value_test.sh
+          bash test_scripts/run_error_test.sh
 
           cargo llvm-cov report --package vpi --html --output-dir coverage-html
           cargo llvm-cov report --package vpi --lcov --output-path lcov.info

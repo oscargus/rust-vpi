@@ -4,11 +4,12 @@
 //!
 //! | Feature | Description | Default |
 //! |---------|-------------|---------|
-//! | `bigint` | Enables conversion between [`ScalarValue`] slices and arbitrary-precision integers using [`num_bigint::BigInt`] and [`num_bigint::BigUint`]. | No |
+//! | `bigint` | Enables conversion between [`LogicVec`] and arbitrary-precision integers using [`num_bigint::BigInt`] and [`num_bigint::BigUint`]. | No |
 //! | `cb_info` | Uses `vpi_get_cb_info` when removing callbacks. | Yes |
 //! | `dynamic` | Enables runtime VPI symbol lookup via `vpi-shim` on Windows and macOS, allowing plugins to build without directly linking to a simulator library. | No |
 //! | `sv`     | Enables SystemVerilog VPI extensions (types, callbacks, and properties defined in IEEE 1800). | No |
 //! | `value_array` | Enables support for VPI array values via `vpi_get_value_array` and `vpi_put_value_array`. Otherwise the related functions are still available, but use repeated calls to the scalar `vpi_get_value` and `vpi_put_value` functions. | No |
+//! | `verilator` | Enables support for Verilator-specific VPI extensions, including two-state and four-state raw vector values. | No |
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
 #[cfg(all(feature = "dynamic", any(target_os = "windows", target_os = "macos")))]
@@ -22,6 +23,7 @@ mod control;
 mod delays;
 mod error;
 mod handle;
+mod logic;
 mod mcd;
 mod object;
 mod property;
@@ -38,6 +40,7 @@ pub use control::*;
 pub use delays::*;
 pub use error::*;
 pub use handle::*;
+pub use logic::*;
 pub use mcd::*;
 pub use object::*;
 pub use property::*;
