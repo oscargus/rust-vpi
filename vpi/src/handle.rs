@@ -5,7 +5,7 @@ use vpi_sys::{vpiHandle, PLI_INT32};
 ///
 /// This type provides convenience helpers for common handle operations and
 /// iteration over child objects.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Handle {
     /// Underlying simulator-owned VPI handle pointer.
     handle: vpiHandle,
@@ -25,11 +25,12 @@ impl PartialEq for Handle {
 
 impl Drop for Handle {
     fn drop(&mut self) {
-        /*   if !self.is_null() {
+        #[cfg(feature = "release_handle")]
+        if !self.is_null() {
             unsafe {
                 vpi_sys::vpi_release_handle(self.handle);
             }
-        }*/
+        }
     }
 }
 

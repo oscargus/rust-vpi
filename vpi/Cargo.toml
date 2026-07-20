@@ -26,6 +26,7 @@ dynamic = ["dep:vpi-shim"]
 bigint = ["dep:num-bigint"]
 sv = ["vpi-sys/sv", "vpi-shim?/sv"]
 verilator = []
+release_handle = []
 
 [target.'cfg(any(target_os = "windows", target_os = "macos"))'.dependencies]
 vpi-shim = { workspace = true, optional = true }
