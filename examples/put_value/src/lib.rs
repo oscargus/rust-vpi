@@ -1,8 +1,7 @@
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use vpi::{
-    control, register_cb, register_cb_with_time, scalar_vector_to_string, startup_routines,
-    string_to_scalar_vector, value_array_to_int_array, CbData, CbReason, Control, Handle,
-    ScalarValue, Time, Value, ValueType,
+    control, register_cb, register_cb_with_time, startup_routines, value_array_to_int_array,
+    CbData, CbReason, Control, Handle, LogicVal, LogicVec, Time, Value, ValueType,
 };
 
 startup_routines!(put_value_startup);
@@ -23,7 +22,7 @@ const ARR_OUT_1: &str = "put_value_dut.arr_out[1]";
 #[derive(Copy, Clone)]
 struct TestCase {
     name: &'static str,
-    bit_in: ScalarValue,
+    bit_in: LogicVal,
     vec_in: &'static str,
     int_in: i32,
     int_arr_in: [i32; 2],
@@ -50,7 +49,7 @@ struct DutHandles {
 const TESTS: [TestCase; 5] = [
     TestCase {
         name: "ones_and_alternating_a5",
-        bit_in: ScalarValue::One,
+        bit_in: LogicVal::One,
         vec_in: "10100101",
         int_in: 41,
         int_arr_in: [41, -12],
@@ -60,7 +59,7 @@ const TESTS: [TestCase; 5] = [
     },
     TestCase {
         name: "zeros_and_all_zero",
-        bit_in: ScalarValue::Zero,
+        bit_in: LogicVal::Zero,
         vec_in: "00000000",
         int_in: 0,
         int_arr_in: [0, 0],
@@ -70,7 +69,7 @@ const TESTS: [TestCase; 5] = [
     },
     TestCase {
         name: "mixed_3c_and_negative",
-        bit_in: ScalarValue::One,
+        bit_in: LogicVal::One,
         vec_in: "00111100",
         int_in: -7,
         int_arr_in: [-7, 1024],
@@ -80,7 +79,7 @@ const TESTS: [TestCase; 5] = [
     },
     TestCase {
         name: "mixed_f0_and_large_positive",
-        bit_in: ScalarValue::Zero,
+        bit_in: LogicVal::Zero,
         vec_in: "11110000",
         int_in: 12345,
         int_arr_in: [12345, -222],
@@ -90,7 +89,7 @@ const TESTS: [TestCase; 5] = [
     },
     TestCase {
         name: "mixed_xzhl_states",
-        bit_in: ScalarValue::One,
+        bit_in: LogicVal::One,
         vec_in: "XZHL10ZH",
         int_in: 99,
         int_arr_in: [99, 7],
@@ -156,42 +155,42 @@ fn resolve_dut_handles() -> Option<DutHandles> {
     }
 }
 
-fn invert_binary_scalar(value: ScalarValue) -> ScalarValue {
+fn invert_binary_scalar(value: LogicVal) -> LogicVal {
     match value {
-        ScalarValue::Zero => ScalarValue::One,
-        ScalarValue::One => ScalarValue::Zero,
-        _ => ScalarValue::X,
+        LogicVal::Zero => LogicVal::One,
+        LogicVal::One => LogicVal::Zero,
+        _ => LogicVal::X,
     }
 }
 
-fn normalize_vector_roundtrip_scalar(value: ScalarValue) -> ScalarValue {
+fn normalize_vector_roundtrip_scalar(value: LogicVal) -> LogicVal {
     match value {
-        ScalarValue::H => ScalarValue::One,
-        ScalarValue::L => ScalarValue::Zero,
-        ScalarValue::DontCare => ScalarValue::X,
+        LogicVal::H => LogicVal::One,
+        LogicVal::L => LogicVal::Zero,
+        LogicVal::DontCare => LogicVal::X,
         other => other,
     }
 }
 
 fn normalized_scalar_string(bits: &str) -> Option<String> {
-    let values = string_to_scalar_vector(bits)?;
-    let values: Vec<ScalarValue> = values
+    let values = LogicVec::try_from(bits).ok()?;
+    let values: Vec<LogicVal> = values
         .iter()
         .copied()
         .map(normalize_vector_roundtrip_scalar)
         .collect();
-    Some(scalar_vector_to_string(&values))
+    Some(LogicVec::from(values).to_string())
 }
 
 fn inverted_scalar_string(bits: &str) -> Option<String> {
-    let values = string_to_scalar_vector(bits)?;
-    let values: Vec<ScalarValue> = values
+    let values = LogicVec::try_from(bits).ok()?;
+    let values: Vec<LogicVal> = values
         .iter()
         .copied()
         .map(normalize_vector_roundtrip_scalar)
         .map(invert_binary_scalar)
         .collect();
-    Some(scalar_vector_to_string(&values))
+    Some(LogicVec::from(values).to_string())
 }
 
 fn run_next_test(_cb_data: &CbData) {
@@ -217,7 +216,7 @@ fn run_next_test(_cb_data: &CbData) {
     let test = TESTS[index];
     vpi::printf!("Running test {}: {}", index + 1, test.name);
 
-    let Some(vec_in_values) = string_to_scalar_vector(test.vec_in) else {
+    let Some(vec_in_values) = LogicVec::try_from_str(test.vec_in) else {
         vpi::printf!(
             "ERROR [{}]: invalid vec_in scalar string '{}'",
             test.name,
@@ -227,7 +226,7 @@ fn run_next_test(_cb_data: &CbData) {
         control(Control::Finish);
         return;
     };
-    let Some(arr_in_0_values) = string_to_scalar_vector(test.arr_in[0]) else {
+    let Some(arr_in_0_values) = LogicVec::try_from_str(test.arr_in[0]) else {
         vpi::printf!(
             "ERROR [{}]: invalid arr_in[0] scalar string '{}'",
             test.name,
@@ -237,7 +236,7 @@ fn run_next_test(_cb_data: &CbData) {
         control(Control::Finish);
         return;
     };
-    let Some(arr_in_1_values) = string_to_scalar_vector(test.arr_in[1]) else {
+    let Some(arr_in_1_values) = LogicVec::try_from_str(test.arr_in[1]) else {
         vpi::printf!(
             "ERROR [{}]: invalid arr_in[1] scalar string '{}'",
             test.name,
@@ -249,7 +248,7 @@ fn run_next_test(_cb_data: &CbData) {
     };
 
     let _ = handles.bit_in.put_value(&Value::Scalar(test.bit_in));
-    let _ = handles.vec_in.put_value(&Value::Vector(vec_in_values));
+    let _ = handles.vec_in.put_value(&vec_in_values.as_vector_value());
     let _ = handles.int_in.put_value(&Value::Int(test.int_in));
     let int_arr_in_values = vpi::int_array_to_value_array(test.int_arr_in);
     if !handles.int_arr_in.put_value_array(&int_arr_in_values) {
@@ -258,8 +257,12 @@ fn run_next_test(_cb_data: &CbData) {
         control(Control::Finish);
         return;
     }
-    let _ = handles.arr_in_0.put_value(&Value::Vector(arr_in_0_values));
-    let _ = handles.arr_in_1.put_value(&Value::Vector(arr_in_1_values));
+    let _ = handles
+        .arr_in_0
+        .put_value(&arr_in_0_values.as_vector_value());
+    let _ = handles
+        .arr_in_1
+        .put_value(&arr_in_1_values.as_vector_value());
 
     let _ = register_cb_with_time(
         CbReason::AfterDelay,
@@ -311,7 +314,7 @@ fn verify_current_test(_cb_data: &CbData) {
     };
     match handles.vec_in.get_value(ValueType::Vector) {
         Some(Value::Vector(v)) => {
-            let s = scalar_vector_to_string(&v);
+            let s = v.to_string();
             if s != expected_in_vec {
                 ok = false;
                 vpi::printf!(
@@ -350,7 +353,7 @@ fn verify_current_test(_cb_data: &CbData) {
 
         match handle.get_value(ValueType::Vector) {
             Some(Value::Vector(v)) => {
-                let s = scalar_vector_to_string(&v);
+                let s = v.to_string();
                 if s != expected {
                     ok = false;
                     vpi::printf!(
@@ -435,7 +438,7 @@ fn verify_current_test(_cb_data: &CbData) {
     };
     match handles.vec_out.get_value(ValueType::Vector) {
         Some(Value::Vector(v)) => {
-            let s = scalar_vector_to_string(&v);
+            let s = v.to_string();
             if s != expected_out_vec {
                 ok = false;
                 vpi::printf!(
@@ -474,7 +477,7 @@ fn verify_current_test(_cb_data: &CbData) {
 
         match handle.get_value(ValueType::Vector) {
             Some(Value::Vector(v)) => {
-                let s = scalar_vector_to_string(&v);
+                let s = v.to_string();
                 if s != expected {
                     ok = false;
                     vpi::printf!(

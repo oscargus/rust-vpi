@@ -91,18 +91,15 @@ unsafe extern "C" fn sizetf_reverse_bits(_user_data: *mut c_char) -> i32 {
 }
 
 unsafe extern "C" fn calltf_reverse_bits(_user_data: *mut c_char) -> i32 {
-    let Some(Value::BinStr(bits)) = get_systf_arg(0, ValueType::BinStr) else {
+    let Some(Value::Vector(vec)) = get_systf_arg(0, ValueType::Vector) else {
         return 0;
     };
 
-    let reversed: String = bits.chars().rev().collect();
-    let Some(reversed_vec) = vpi::string_to_scalar_vector(&reversed) else {
-        return 0;
-    };
+    let reversed_vec = vec.reverse();
 
     let call = current_systf_call();
-    let _ = call.put_value(&Value::Vector(reversed_vec));
+    let _ = call.put_value(&reversed_vec.as_vector_value());
 
-    vpi::printf!("$rust_reverse_bits arg={} result={}", bits, reversed);
+    vpi::printf!("$rust_reverse_bits arg={} result={}", vec, reversed_vec);
     0
 }

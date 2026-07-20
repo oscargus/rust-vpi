@@ -5,7 +5,10 @@ use num_derive::{FromPrimitive, ToPrimitive};
 use num_traits::FromPrimitive;
 use vpi_sys::PLI_INT32;
 
-use crate::{Handle, Property, Time};
+#[cfg(feature = "verilator")]
+use crate::scalar_vector_to_vecval;
+
+use crate::{Handle, LogicVal, LogicVec, Property, Time};
 
 /// High-level value representation returned from or written to VPI objects.
 #[derive(Debug, Clone, PartialEq)]
@@ -19,7 +22,7 @@ pub enum Value {
     /// Decimal string value.
     DecStr(String),
     /// 4-state scalar value.
-    Scalar(ScalarValue),
+    Scalar(LogicVal),
     /// 32-bit signed integer value.
     Int(i32),
     /// 64-bit floating-point value.
@@ -27,7 +30,7 @@ pub enum Value {
     /// Plain string value.
     String(String),
     /// Vector of scalar bits.
-    Vector(Vec<ScalarValue>),
+    Vector(LogicVec),
     /// Value with drive-strength information.
     Strength(StrengthValue),
     /// Time value.
@@ -49,9 +52,11 @@ pub enum Value {
     /// 32-bit floating-point value.
     ShortReal(f32),
     /// Raw 2-state packed bits.
+    #[cfg(feature = "verilator")]
     RawTwoState(Vec<bool>), // Each bit is either 0 or 1
     /// Raw 4-state packed bits.
-    RawFourState(Vec<ScalarValue>), // Each bit can be 0, 1, X, or Z
+    #[cfg(feature = "verilator")]
+    RawFourState(LogicVec), // Each bit can be 0, 1, X, or Z
 }
 
 impl Display for Value {
@@ -64,7 +69,7 @@ impl Display for Value {
             Value::Int(i) => write!(f, "{i}"),
             Value::Real(r) => write!(f, "{r}"),
             Value::String(s) => write!(f, "\"{s}\""),
-            Value::Vector(vec) => write!(f, "{}", scalar_vector_to_string(vec)),
+            Value::Vector(vec) => write!(f, "{vec}"),
             Value::Strength(strength) => write!(f, "{strength}"),
             Value::Time(time) => write!(f, "{time}"),
             Value::ObjType(obj_type) => write!(f, "ObjType({obj_type})"), // Placeholder
@@ -72,6 +77,7 @@ impl Display for Value {
             Value::ShortInt(i) => write!(f, "{i}"),
             Value::LongInt(i) => write!(f, "{i}"),
             Value::ShortReal(r) => write!(f, "{r}"),
+            #[cfg(feature = "verilator")]
             Value::RawTwoState(vec) => {
                 write!(
                     f,
@@ -81,7 +87,8 @@ impl Display for Value {
                         .collect::<String>()
                 )
             }
-            Value::RawFourState(vec) => write!(f, "{}", scalar_vector_to_string(vec)),
+            #[cfg(feature = "verilator")]
+            Value::RawFourState(vec) => write!(f, "{vec}"),
         }
     }
 }
@@ -128,8 +135,10 @@ pub enum ValueType {
     /// 32-bit floating-point format.
     ShortReal = vpi_sys::vpiShortRealVal,
     /// Raw packed 2-state vector format.
+    #[cfg(feature = "verilator")]
     RawTwoState = vpi_sys::vpiRawTwoStateVal,
     /// Raw packed 4-state vector format.
+    #[cfg(feature = "verilator")]
     RawFourState = vpi_sys::vpiRawFourStateVal,
 }
 
@@ -152,50 +161,12 @@ impl std::fmt::Display for ValueType {
             ValueType::ShortInt => "Short Integer",
             ValueType::LongInt => "Long Integer",
             ValueType::ShortReal => "Short Real",
+            #[cfg(feature = "verilator")]
             ValueType::RawTwoState => "Raw Two-State Vector",
+            #[cfg(feature = "verilator")]
             ValueType::RawFourState => "Raw Four-State Vector",
         };
         write!(f, "{type_name}")
-    }
-}
-
-#[repr(u32)]
-#[derive(FromPrimitive, ToPrimitive, Copy, Clone, Debug, PartialEq)]
-/// 4-state scalar encodings used by VPI.
-pub enum ScalarValue {
-    /// Logic `0`.
-    Zero = vpi_sys::vpi0,
-    /// Logic `1`.
-    One = vpi_sys::vpi1,
-    /// High-impedance state.
-    Z = vpi_sys::vpiZ,
-    /// Unknown logic state.
-    X = vpi_sys::vpiX,
-    /// Weak high state.
-    H = vpi_sys::vpiH,
-    /// Weak low state.
-    L = vpi_sys::vpiL,
-    /// Don't-care state.
-    DontCare = vpi_sys::vpiDontCare,
-}
-
-impl Display for ScalarValue {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", char::from(*self))
-    }
-}
-
-impl From<ScalarValue> for char {
-    fn from(value: ScalarValue) -> Self {
-        match value {
-            ScalarValue::Zero => '0',
-            ScalarValue::One => '1',
-            ScalarValue::X => 'X',
-            ScalarValue::Z => 'Z',
-            ScalarValue::H => 'H',
-            ScalarValue::L => 'L',
-            ScalarValue::DontCare => '-',
-        }
     }
 }
 
@@ -203,7 +174,7 @@ impl From<ScalarValue> for char {
 /// Scalar logic value plus drive strengths.
 pub struct StrengthValue {
     /// Scalar logic state carried by the value.
-    logic: ScalarValue,
+    logic: LogicVal,
     /// Drive strength applied when the logic resolves to `0`.
     strength0: Strength,
     /// Drive strength applied when the logic resolves to `1`.
@@ -223,7 +194,7 @@ impl Display for StrengthValue {
 impl StrengthValue {
     /// Creates a scalar value with associated drive strengths.
     #[must_use]
-    pub fn new(logic: ScalarValue, strength0: Strength, strength1: Strength) -> Self {
+    pub fn new(logic: LogicVal, strength0: Strength, strength1: Strength) -> Self {
         Self {
             logic,
             strength0,
@@ -234,7 +205,7 @@ impl StrengthValue {
 
 impl From<vpi_sys::t_vpi_strengthval> for StrengthValue {
     fn from(strength: vpi_sys::t_vpi_strengthval) -> Self {
-        let logic = ScalarValue::from_u32(strength.logic as u32).unwrap_or(ScalarValue::DontCare);
+        let logic = LogicVal::from_u32(strength.logic as u32).unwrap_or(LogicVal::DontCare);
         let strength0 = Strength::from_u32(strength.s0 as u32).unwrap_or(Strength::HiZ);
         let strength1 = Strength::from_u32(strength.s1 as u32).unwrap_or(Strength::HiZ);
         Self {
@@ -312,31 +283,6 @@ struct PutValueArrayPayload {
     _shortreals: Option<Vec<f32>>,
 }
 
-fn scalar_to_ab_bits(value: ScalarValue) -> (i32, i32) {
-    match value {
-        ScalarValue::Zero | ScalarValue::L => (0, 0),
-        ScalarValue::One | ScalarValue::H => (1, 0),
-        ScalarValue::Z => (0, 1),
-        ScalarValue::X | ScalarValue::DontCare => (1, 1),
-    }
-}
-
-fn scalar_vector_to_vecval(bits: impl AsRef<[ScalarValue]>) -> Vec<vpi_sys::t_vpi_vecval> {
-    let bits = bits.as_ref();
-    let word_count = bits.len().div_ceil(32);
-    let mut vecvals = vec![vpi_sys::t_vpi_vecval { aval: 0, bval: 0 }; word_count.max(1)];
-
-    for (bit_index, bit) in bits.iter().rev().enumerate() {
-        let word = bit_index / 32;
-        let pos = bit_index % 32;
-        let (a, b) = scalar_to_ab_bits(*bit);
-        vecvals[word].aval |= a << pos;
-        vecvals[word].bval |= b << pos;
-    }
-
-    vecvals
-}
-
 fn cstring_lossy_no_nul(s: &str) -> CString {
     let bytes: Vec<u8> = s.bytes().filter(|b| *b != 0).collect();
     CString::new(bytes).expect("string was sanitized to exclude interior NUL")
@@ -407,8 +353,8 @@ fn encode_value_for_put(value: &Value) -> PutValuePayload {
             };
             payload._string = Some(cstr);
         }
-        Value::Vector(bits) => {
-            let mut vector = scalar_vector_to_vecval(bits);
+        Value::Vector(vec) => {
+            let mut vector = vec.as_vecval();
             payload.raw.format = vpi_sys::vpiVectorVal as i32;
             payload.raw.value = vpi_sys::t_vpi_value__bindgen_ty_1 {
                 vector: vector.as_mut_ptr(),
@@ -463,16 +409,11 @@ fn encode_value_for_put(value: &Value) -> PutValuePayload {
                 real: f64::from(*v),
             };
         }
+        #[cfg(feature = "verilator")]
         Value::RawTwoState(bits) => {
-            let scalar_bits: Vec<ScalarValue> = bits
+            let scalar_bits: Vec<LogicVal> = bits
                 .iter()
-                .map(|bit| {
-                    if *bit {
-                        ScalarValue::One
-                    } else {
-                        ScalarValue::Zero
-                    }
-                })
+                .map(|bit| if *bit { LogicVal::One } else { LogicVal::Zero })
                 .collect();
             let mut vector = scalar_vector_to_vecval(&scalar_bits);
             payload.raw.format = vpi_sys::vpiVectorVal as i32;
@@ -481,8 +422,9 @@ fn encode_value_for_put(value: &Value) -> PutValuePayload {
             };
             payload._vector = Some(vector);
         }
-        Value::RawFourState(bits) => {
-            let mut vector = scalar_vector_to_vecval(bits);
+        #[cfg(feature = "verilator")]
+        Value::RawFourState(vec) => {
+            let mut vector = vec.as_vecval();
             payload.raw.format = vpi_sys::vpiVectorVal as i32;
             payload.raw.value = vpi_sys::t_vpi_value__bindgen_ty_1 {
                 vector: vector.as_mut_ptr(),
@@ -663,58 +605,6 @@ bitflags::bitflags! {
     }
 }
 
-/// Convert VPI vector values to a vector of scalar values
-///
-/// The VPI vecval structure encodes each bit as a pair (aval, bval):
-/// - ab: 00 = 0 (Zero)
-/// - ab: 10 = 1 (One)
-/// - ab: 11 = X (X)
-/// - ab: 01 = Z (Z)
-///
-/// # Arguments
-/// * `vec` - Array of `vpi_vecval` structures containing the encoded bits
-/// * `size` - Number of bits to extract
-#[must_use]
-fn vector_value_to_scalar_vector(vec: &[vpi_sys::t_vpi_vecval], size: usize) -> Vec<ScalarValue> {
-    let mut result = Vec::with_capacity(size);
-
-    for bit_index in 0..size {
-        // Which word in the vecval array contains this bit?
-        let word_index = bit_index / 32;
-        // Which bit position within that word?
-        let bit_position = bit_index % 32;
-
-        if word_index >= vec.len() {
-            // If we've run out of vecval words, treat as 0
-            result.push(ScalarValue::Zero);
-            continue;
-        }
-
-        let vecval = &vec[word_index];
-
-        // Extract the a and b bits
-        let a_bit = (vecval.aval >> bit_position) & 1;
-        let b_bit = (vecval.bval >> bit_position) & 1;
-
-        // Combine into the encoding: (a << 1) | b
-        // 00=0, 10=1, 11=X, 01=Z
-        let encoded = (a_bit << 1) | b_bit;
-
-        let scalar = match encoded {
-            0 => ScalarValue::Zero,
-            1 => ScalarValue::Z,
-            2 => ScalarValue::One,
-            3 => ScalarValue::X,
-            _ => ScalarValue::DontCare, // Should never happen
-        };
-
-        result.push(scalar);
-    }
-
-    result.reverse(); // Reverse to match Verilog bit ordering (MSB at index 0)
-    result
-}
-
 /// Decode a raw `t_vpi_value` into a high-level [`Value`].
 ///
 /// `obj` is used for value formats that require object context (for example,
@@ -742,8 +632,8 @@ pub(crate) fn decode_vpi_value(
             Some(Value::DecStr(c_str.to_str().unwrap_or("").to_string()))
         }
         vpi_sys::vpiScalarVal => Some(Value::Scalar(
-            ScalarValue::from_u32(unsafe { raw_value.value.integer } as u32)
-                .unwrap_or(ScalarValue::DontCare),
+            LogicVal::from_u32(unsafe { raw_value.value.integer } as u32)
+                .unwrap_or(LogicVal::DontCare),
         )),
         vpi_sys::vpiIntVal => Some(Value::Int(unsafe { raw_value.value.integer })),
         vpi_sys::vpiRealVal => Some(Value::Real(unsafe { raw_value.value.real })),
@@ -755,7 +645,7 @@ pub(crate) fn decode_vpi_value(
         vpi_sys::vpiVectorVal => {
             let vec_ptr = unsafe { raw_value.value.vector };
             if vec_ptr.is_null() {
-                Some(Value::Vector(vec![]))
+                Some(Value::Vector(LogicVec::empty()))
             } else {
                 let size = if obj.is_null() {
                     0usize
@@ -764,7 +654,7 @@ pub(crate) fn decode_vpi_value(
                 };
                 let num_words = size.div_ceil(32);
                 let vec = unsafe { std::slice::from_raw_parts(vec_ptr, num_words) };
-                Some(Value::Vector(vector_value_to_scalar_vector(vec, size)))
+                Some(Value::Vector(LogicVec::from_vecval(vec, size)))
             }
         }
         vpi_sys::vpiStrengthVal => {
@@ -838,6 +728,7 @@ pub fn value_array_to_string_array(
                 _ => None,
             })
             .collect(),
+        #[cfg(feature = "verilator")]
         ValueType::RawTwoState => values
             .iter()
             .map(|value| match value {
@@ -845,6 +736,7 @@ pub fn value_array_to_string_array(
                 _ => None,
             })
             .collect(),
+        #[cfg(feature = "verilator")]
         ValueType::RawFourState => values
             .iter()
             .map(|value| match value {
@@ -946,7 +838,7 @@ pub fn value_array_to_shortreal_array(values: impl AsRef<[Value]>) -> Option<Vec
 /// Every element must be [`Value::Scalar`]. Returns `None` if any element has
 /// a different variant.
 #[must_use]
-pub fn value_array_to_scalar_array(values: impl AsRef<[Value]>) -> Option<Vec<ScalarValue>> {
+pub fn value_array_to_scalar_array(values: impl AsRef<[Value]>) -> Option<Vec<LogicVal>> {
     let values = values.as_ref();
 
     values
@@ -1024,8 +916,9 @@ pub fn string_array_to_value_array(
         ValueType::String => Some(values.iter().cloned().map(Value::String).collect()),
         ValueType::Vector => values
             .iter()
-            .map(|value| string_to_scalar_vector(value).map(Value::Vector))
+            .map(|value| LogicVec::try_from_str(value).map(Value::Vector))
             .collect(),
+        #[cfg(feature = "verilator")]
         ValueType::RawTwoState => values
             .iter()
             .map(|value| {
@@ -1040,9 +933,10 @@ pub fn string_array_to_value_array(
                     .map(Value::RawTwoState)
             })
             .collect(),
+        #[cfg(feature = "verilator")]
         ValueType::RawFourState => values
             .iter()
-            .map(|value| string_to_scalar_vector(value).map(Value::RawFourState))
+            .map(|value| LogicVec::try_from_str(value).map(Value::RawFourState))
             .collect(),
         _ => None,
     }
@@ -1107,7 +1001,7 @@ pub fn shortreal_array_to_value_array(values: impl AsRef<[f32]>) -> Vec<Value> {
 ///
 /// Produces [`Value::Scalar`] for each element.
 #[must_use]
-pub fn scalar_array_to_value_array(values: impl AsRef<[ScalarValue]>) -> Vec<Value> {
+pub fn scalar_array_to_value_array(values: impl AsRef<[LogicVal]>) -> Vec<Value> {
     values.as_ref().iter().copied().map(Value::Scalar).collect()
 }
 
@@ -1132,53 +1026,57 @@ pub fn strength_array_to_value_array(values: impl AsRef<[StrengthValue]>) -> Vec
         .collect()
 }
 
-/// Convert a binary-encoded [`ScalarValue`] slice (MSB at index 0) to a [`num_bigint::BigUint`].
+/// Convert a binary-encoded [`LogicVal`] slice (MSB at index 0) to a [`num_bigint::BigUint`].
 ///
 /// Returns `None` if any element is not a definite binary value
-/// ([`ScalarValue::Zero`] or [`ScalarValue::One`]).
+/// ([`LogicVal::Zero`] or [`LogicVal::One`]).
 /// Any `X`, `Z`, `H`, `L`, or `DontCare` bit causes `None` to be returned.
 #[cfg(feature = "bigint")]
 #[must_use]
-pub fn scalar_vector_to_biguint(bits: impl AsRef<[ScalarValue]>) -> Option<num_bigint::BigUint> {
+pub fn scalar_vector_to_biguint(bits: impl AsRef<[LogicVal]>) -> Option<num_bigint::BigUint> {
     let mut result = num_bigint::BigUint::ZERO;
     for bit in bits.as_ref() {
         result <<= 1u32;
         match bit {
-            ScalarValue::Zero => {}
-            ScalarValue::One => result |= num_bigint::BigUint::from(1u32),
+            LogicVal::Zero => {}
+            LogicVal::One => result |= num_bigint::BigUint::from(1u32),
             _ => return None,
         }
     }
     Some(result)
 }
 
-/// Convert a `u64` to a binary-encoded [`Vec<ScalarValue>`] (MSB at index 0).
+/// Convert a `u64` to a binary-encoded [`Vec<LogicVal>`] (MSB at index 0).
 ///
 /// The returned vector always contains exactly `bits` elements. If `value`
 /// requires more than `bits` bits to represent, the most-significant bits are
 /// silently truncated.
 #[must_use]
-pub fn uint64_to_scalar_vector(value: u64, bits: usize) -> Vec<ScalarValue> {
+#[deprecated(
+    since = "0.5.0",
+    note = "Use `LogicVec::from_uint(value)` instead of this function."
+)]
+pub fn uint64_to_scalar_vector(value: u64, bits: usize) -> Vec<LogicVal> {
     (0..bits)
         .rev()
         .map(|i| {
             if (value >> i) & 1 == 1 {
-                ScalarValue::One
+                LogicVal::One
             } else {
-                ScalarValue::Zero
+                LogicVal::Zero
             }
         })
         .collect()
 }
 
-/// Convert a binary-encoded [`ScalarValue`] slice (MSB at index 0) to a `u64`.
+/// Convert a binary-encoded [`LogicVal`] slice (MSB at index 0) to a `u64`.
 ///
 /// Returns `None` if the slice contains more than 64 bits or if any element is
-/// not a definite binary value ([`ScalarValue::Zero`] or [`ScalarValue::One`]).
+/// not a definite binary value ([`LogicVal::Zero`] or [`LogicVal::One`]).
 /// Any `X`, `Z`, `H`, `L`, or `DontCare` bit causes `None` to be
 /// returned.
 #[must_use]
-pub fn scalar_vector_to_uint64(bits: impl AsRef<[ScalarValue]>) -> Option<u64> {
+pub fn scalar_vector_to_uint64(bits: impl AsRef<[LogicVal]>) -> Option<u64> {
     let bits = bits.as_ref();
     if bits.len() > 64 {
         return None;
@@ -1187,8 +1085,8 @@ pub fn scalar_vector_to_uint64(bits: impl AsRef<[ScalarValue]>) -> Option<u64> {
     for bit in bits {
         result <<= 1;
         match bit {
-            ScalarValue::Zero => {}
-            ScalarValue::One => result |= 1,
+            LogicVal::Zero => {}
+            LogicVal::One => result |= 1,
             _ => return None,
         }
     }
@@ -1200,8 +1098,12 @@ pub fn scalar_vector_to_uint64(bits: impl AsRef<[ScalarValue]>) -> Option<u64> {
 /// Each scalar is mapped to its Verilog-style character (`0`, `1`, `X`, `Z`,
 /// `H`, `L`, `-`) in order (MSB at index 0).
 #[must_use]
-pub fn scalar_vector_to_string(bits: impl AsRef<[ScalarValue]>) -> String {
-    bits.as_ref().iter().copied().map(char::from).collect()
+#[deprecated(
+    since = "0.5.0",
+    note = "Use `LogicVec::from(bits).to_string()` instead of this function."
+)]
+pub fn scalar_vector_to_string(bits: impl AsRef<[LogicVal]>) -> String {
+    LogicVec::from(bits.as_ref()).to_string()
 }
 
 /// Convert a scalar string into a vector of scalar values.
@@ -1210,59 +1112,76 @@ pub fn scalar_vector_to_string(bits: impl AsRef<[ScalarValue]>) -> String {
 /// (also lowercase `x`, `z`, `h`, `l`). Returns `None` if any
 /// character is not a supported scalar symbol.
 #[must_use]
-pub fn string_to_scalar_vector(bits: &str) -> Option<Vec<ScalarValue>> {
+#[deprecated(
+    since = "0.5.0",
+    note = "Use `LogicVec::from_str(bits)` instead of this function."
+)]
+pub fn string_to_scalar_vector(bits: &str) -> Option<Vec<LogicVal>> {
     bits.chars()
         .map(|c| match c {
-            '0' => Some(ScalarValue::Zero),
-            '1' => Some(ScalarValue::One),
-            'X' | 'x' => Some(ScalarValue::X),
-            'Z' | 'z' => Some(ScalarValue::Z),
-            'H' | 'h' => Some(ScalarValue::H),
-            'L' | 'l' => Some(ScalarValue::L),
-            '-' => Some(ScalarValue::DontCare),
+            '0' => Some(LogicVal::Zero),
+            '1' => Some(LogicVal::One),
+            'X' | 'x' => Some(LogicVal::X),
+            'Z' | 'z' => Some(LogicVal::Z),
+            'H' | 'h' => Some(LogicVal::H),
+            'L' | 'l' => Some(LogicVal::L),
+            '-' => Some(LogicVal::DontCare),
             _ => None,
         })
         .collect()
 }
 
-/// Convert a [`num_bigint::BigUint`] to a binary-encoded [`Vec<ScalarValue>`] (MSB at index 0).
+/// Convert a [`num_bigint::BigUint`] to a binary-encoded [`Vec<LogicVal>`] (MSB at index 0).
 ///
 /// The returned vector always contains exactly `bits` elements. If `value`
 /// requires more than `bits` bits to represent, the most-significant bits are
 /// silently truncated.
 #[cfg(feature = "bigint")]
 #[must_use]
-pub fn biguint_to_scalar_vector(value: &num_bigint::BigUint, bits: usize) -> Vec<ScalarValue> {
+#[deprecated(
+    since = "0.5.0",
+    note = "Use `LogicVec::from_biguint(value)` instead of this function."
+)]
+pub fn biguint_to_scalar_vector(value: &num_bigint::BigUint, bits: usize) -> Vec<LogicVal> {
     (0..bits)
         .rev()
         .map(|i| {
             if value.bit(i as u64) {
-                ScalarValue::One
+                LogicVal::One
             } else {
-                ScalarValue::Zero
+                LogicVal::Zero
             }
         })
         .collect()
 }
 
-/// Convert an `i64` to a two's-complement-encoded [`Vec<ScalarValue>`] (MSB at index 0).
+/// Convert an `i64` to a two's-complement-encoded [`Vec<LogicVal>`] (MSB at index 0).
 ///
 /// The returned vector always contains exactly `bits` elements. If `bits` is
 /// smaller than needed to represent the value, the most-significant bits are
 /// silently truncated.
 #[must_use]
-pub fn int64_to_scalar_vector(value: i64, bits: usize) -> Vec<ScalarValue> {
+#[deprecated(
+    since = "0.5.0",
+    note = "Use `LogicVec::from_int(value, bits)` instead of this function."
+)]
+pub fn int64_to_scalar_vector(value: i64, bits: usize) -> Vec<LogicVal> {
+    #[allow(deprecated)]
     uint64_to_scalar_vector(value as u64, bits)
 }
 
-/// Convert a two's-complement-encoded [`ScalarValue`] slice (MSB at index 0) to an `i64`.
+/// Convert a two's-complement-encoded [`LogicVal`] slice (MSB at index 0) to an `i64`.
 ///
 /// Returns `None` if the slice is empty, contains more than 64 bits, or if any
-/// element is not a definite binary value ([`ScalarValue::Zero`] or
-/// [`ScalarValue::One`]). Any `X`, `Z`, `H`, `L`, or `DontCare`
+/// element is not a definite binary value ([`LogicVal::Zero`] or
+/// [`LogicVal::One`]). Any `X`, `Z`, `H`, `L`, or `DontCare`
 /// bit causes `None` to be returned.
 #[must_use]
-pub fn scalar_vector_to_int64(bits: impl AsRef<[ScalarValue]>) -> Option<i64> {
+#[deprecated(
+    since = "0.5.0",
+    note = "Use `LogicVec::from(bits).try_into()` instead of this function."
+)]
+pub fn scalar_vector_to_int64(bits: impl AsRef<[LogicVal]>) -> Option<i64> {
     let bits = bits.as_ref();
     if bits.is_empty() || bits.len() > 64 {
         return None;
@@ -1273,7 +1192,7 @@ pub fn scalar_vector_to_int64(bits: impl AsRef<[ScalarValue]>) -> Option<i64> {
     Some((unsigned << shift) as i64 >> shift)
 }
 
-/// Convert a [`num_bigint::BigInt`] to a two's-complement-encoded [`Vec<ScalarValue>`]
+/// Convert a [`num_bigint::BigInt`] to a two's-complement-encoded [`Vec<LogicVal>`]
 /// (MSB at index 0).
 ///
 /// The returned vector always contains exactly `bits` elements. If `bits` is
@@ -1281,7 +1200,11 @@ pub fn scalar_vector_to_int64(bits: impl AsRef<[ScalarValue]>) -> Option<i64> {
 /// silently truncated.
 #[cfg(feature = "bigint")]
 #[must_use]
-pub fn bigint_to_scalar_vector(value: &num_bigint::BigInt, bits: usize) -> Vec<ScalarValue> {
+#[deprecated(
+    since = "0.5.0",
+    note = "Use `LogicVec::from_bigint(value)` instead of this function."
+)]
+pub fn bigint_to_scalar_vector(value: &num_bigint::BigInt, bits: usize) -> Vec<LogicVal> {
     use num_bigint::Sign;
     // Two's complement: for negative numbers, add 2^bits to get the unsigned representation.
     let unsigned: num_bigint::BigUint = if value.sign() == Sign::Minus {
@@ -1291,25 +1214,31 @@ pub fn bigint_to_scalar_vector(value: &num_bigint::BigInt, bits: usize) -> Vec<S
     } else {
         value.magnitude().clone()
     };
+    #[allow(deprecated)]
     biguint_to_scalar_vector(&unsigned, bits)
 }
 
-/// Convert a two's-complement-encoded [`ScalarValue`] slice (MSB at index 0) to a
+/// Convert a two's-complement-encoded [`LogicVal`] slice (MSB at index 0) to a
 /// [`num_bigint::BigInt`].
 ///
 /// Returns `None` if the slice is empty or if any element is not a definite
-/// binary value ([`ScalarValue::Zero`] or [`ScalarValue::One`]). Any `X`, `Z`,
+/// binary value ([`LogicVal::Zero`] or [`LogicVal::One`]). Any `X`, `Z`,
 /// `H`, `L`, or `DontCare` bit causes `None` to be returned.
 #[cfg(feature = "bigint")]
 #[must_use]
-pub fn scalar_vector_to_bigint(bits: impl AsRef<[ScalarValue]>) -> Option<num_bigint::BigInt> {
+#[deprecated(
+    since = "0.5.0",
+    note = "Use `LogicVec::as_bigint` instead of this function."
+)]
+pub fn scalar_vector_to_bigint(bits: impl AsRef<[LogicVal]>) -> Option<num_bigint::BigInt> {
     let bits = bits.as_ref();
     if bits.is_empty() {
         return None;
     }
+    #[allow(deprecated)]
     let unsigned = scalar_vector_to_biguint(bits)?;
     // If MSB is One the value is negative: subtract 2^n.
-    if bits[0] == ScalarValue::One {
+    if bits[0] == LogicVal::One {
         let modulus = num_bigint::BigUint::from(1u32) << bits.len();
         Some(num_bigint::BigInt::from(unsigned) - num_bigint::BigInt::from(modulus))
     } else {
@@ -1737,7 +1666,7 @@ impl Handle {
                 Some(
                     rawvals
                         .into_iter()
-                        .filter_map(|v| ScalarValue::from_u32(v as u32).map(Value::Scalar))
+                        .filter_map(|v| LogicVal::from_u32(v as u32).map(Value::Scalar))
                         .collect::<Vec<Value>>(),
                 )
             }
@@ -1797,60 +1726,13 @@ impl Handle {
 #[cfg(test)]
 mod tests {
     use super::{
-        cstring_lossy_no_nul, encode_value_for_put, int64_to_scalar_vector, scalar_to_ab_bits,
-        scalar_vector_to_int64, scalar_vector_to_string, scalar_vector_to_uint64,
-        scalar_vector_to_vecval, strength_array_to_value_array, string_array_to_value_array,
-        string_to_scalar_vector, time_array_to_value_array, uint64_to_scalar_vector,
+        cstring_lossy_no_nul, encode_value_for_put, scalar_vector_to_uint64,
+        strength_array_to_value_array, string_array_to_value_array, time_array_to_value_array,
         value_array_to_int_array, value_array_to_strength_array, value_array_to_string_array,
-        value_array_to_time_array, vector_value_to_scalar_vector, PutValueArrayFlags,
-        PutValueDelay, PutValueFlags, ScalarValue, Value, ValueType,
+        value_array_to_time_array, LogicVal, LogicVec, PutValueArrayFlags, PutValueDelay,
+        PutValueFlags, Value, ValueType,
     };
     use crate::{Handle, Strength, StrengthValue, Time};
-
-    fn scalar_vec_to_string(values: Vec<ScalarValue>) -> String {
-        values.into_iter().map(|value| value.to_string()).collect()
-    }
-
-    #[test]
-    fn vector_value_decodes_ab_encoding_and_reverses_bit_order() {
-        let vec = [vpi_sys::t_vpi_vecval {
-            aval: 0b1010,
-            bval: 0b1100,
-        }];
-        let decoded = vector_value_to_scalar_vector(&vec, 4);
-
-        assert_eq!(scalar_vec_to_string(decoded), "XZ10");
-    }
-
-    #[test]
-    fn vector_value_uses_zero_when_words_are_missing() {
-        let decoded = vector_value_to_scalar_vector(&[], 3);
-
-        assert_eq!(scalar_vec_to_string(decoded), "000");
-    }
-
-    #[test]
-    fn scalar_vector_to_vecval_round_trips_common_states() {
-        let input = vec![
-            ScalarValue::X,
-            ScalarValue::Z,
-            ScalarValue::One,
-            ScalarValue::Zero,
-        ];
-
-        let encoded = scalar_vector_to_vecval(&input);
-        let decoded = vector_value_to_scalar_vector(&encoded, input.len());
-
-        assert_eq!(scalar_vec_to_string(decoded), "XZ10");
-    }
-
-    #[test]
-    fn scalar_to_ab_bits_maps_four_state_logic() {
-        assert_eq!(scalar_to_ab_bits(ScalarValue::Zero), (0, 0));
-        assert_eq!(scalar_to_ab_bits(ScalarValue::One), (1, 0));
-        assert_eq!(scalar_to_ab_bits(ScalarValue::Z), (0, 1));
-        assert_eq!(scalar_to_ab_bits(ScalarValue::X), (1, 1));
-    }
 
     #[test]
     fn cstring_lossy_no_nul_strips_interior_nuls() {
@@ -1935,12 +1817,12 @@ mod tests {
 
     #[test]
     fn encode_value_for_put_vector_allocates_vecval_storage() {
-        let payload = encode_value_for_put(&Value::Vector(vec![
-            ScalarValue::One,
-            ScalarValue::Zero,
-            ScalarValue::X,
-            ScalarValue::Z,
-        ]));
+        let payload = encode_value_for_put(&Value::Vector(LogicVec::from(vec![
+            LogicVal::One,
+            LogicVal::Zero,
+            LogicVal::X,
+            LogicVal::Z,
+        ])));
         assert_eq!(payload.raw.format, vpi_sys::vpiVectorVal as i32);
         assert!(payload._vector.is_some());
         assert!(!payload._vector.as_ref().expect("vector storage").is_empty());
@@ -1985,55 +1867,27 @@ mod tests {
 
     #[test]
     fn value_array_to_string_array_string_rejects_vector_variants() {
-        let vector_values = vec![Value::Vector(vec![ScalarValue::Zero, ScalarValue::One])];
+        let vector_values = vec![Value::Vector(LogicVec::from(vec![
+            LogicVal::Zero,
+            LogicVal::One,
+        ]))];
         assert_eq!(
             value_array_to_string_array(&vector_values, ValueType::String),
-            None
-        );
-
-        let raw_two_state_values = vec![Value::RawTwoState(vec![true, false])];
-        assert_eq!(
-            value_array_to_string_array(&raw_two_state_values, ValueType::String),
-            None
-        );
-
-        let raw_four_state_values = vec![Value::RawFourState(vec![
-            ScalarValue::One,
-            ScalarValue::DontCare,
-        ])];
-        assert_eq!(
-            value_array_to_string_array(&raw_four_state_values, ValueType::String),
             None
         );
     }
 
     #[test]
     fn value_array_to_string_array_supports_vector_like_formats_directly() {
-        let vector_values = vec![Value::Vector(vec![
-            ScalarValue::Zero,
-            ScalarValue::One,
-            ScalarValue::X,
-            ScalarValue::Z,
-        ])];
+        let vector_values = vec![Value::Vector(LogicVec::from(vec![
+            LogicVal::Zero,
+            LogicVal::One,
+            LogicVal::X,
+            LogicVal::Z,
+        ]))];
         assert_eq!(
             value_array_to_string_array(&vector_values, ValueType::Vector),
             Some(vec!["01XZ".to_string()])
-        );
-
-        let raw_two_state_values = vec![Value::RawTwoState(vec![true, false, true, true])];
-        assert_eq!(
-            value_array_to_string_array(&raw_two_state_values, ValueType::RawTwoState),
-            Some(vec!["1011".to_string()])
-        );
-
-        let raw_four_state_values = vec![Value::RawFourState(vec![
-            ScalarValue::One,
-            ScalarValue::Zero,
-            ScalarValue::DontCare,
-        ])];
-        assert_eq!(
-            value_array_to_string_array(&raw_four_state_values, ValueType::RawFourState),
-            Some(vec!["10-".to_string()])
         );
     }
 
@@ -2057,12 +1911,12 @@ mod tests {
     fn value_array_to_strength_array_demotes_strength_values() {
         let values = vec![
             Value::Strength(StrengthValue::new(
-                ScalarValue::One,
+                LogicVal::One,
                 Strength::StrongDrive,
                 Strength::HiZ,
             )),
             Value::Strength(StrengthValue::new(
-                ScalarValue::Zero,
+                LogicVal::Zero,
                 Strength::PullDrive,
                 Strength::WeakDrive,
             )),
@@ -2072,8 +1926,8 @@ mod tests {
         assert_eq!(
             demoted,
             Some(vec![
-                StrengthValue::new(ScalarValue::One, Strength::StrongDrive, Strength::HiZ),
-                StrengthValue::new(ScalarValue::Zero, Strength::PullDrive, Strength::WeakDrive),
+                StrengthValue::new(LogicVal::One, Strength::StrongDrive, Strength::HiZ),
+                StrengthValue::new(LogicVal::Zero, Strength::PullDrive, Strength::WeakDrive),
             ])
         );
     }
@@ -2082,7 +1936,7 @@ mod tests {
     fn value_array_to_strength_array_rejects_mixed_values() {
         let values = vec![
             Value::Strength(StrengthValue::new(
-                ScalarValue::One,
+                LogicVal::One,
                 Strength::StrongDrive,
                 Strength::HiZ,
             )),
@@ -2116,31 +1970,13 @@ mod tests {
         let vector_input = vec!["01XZ-".to_string()];
         assert_eq!(
             string_array_to_value_array(&vector_input, ValueType::Vector),
-            Some(vec![Value::Vector(vec![
-                ScalarValue::Zero,
-                ScalarValue::One,
-                ScalarValue::X,
-                ScalarValue::Z,
-                ScalarValue::DontCare,
-            ])])
-        );
-
-        let raw_two_state_input = vec!["10110".to_string()];
-        assert_eq!(
-            string_array_to_value_array(&raw_two_state_input, ValueType::RawTwoState),
-            Some(vec![Value::RawTwoState(vec![
-                true, false, true, true, false
-            ])])
-        );
-
-        let raw_four_state_input = vec!["10-".to_string()];
-        assert_eq!(
-            string_array_to_value_array(&raw_four_state_input, ValueType::RawFourState),
-            Some(vec![Value::RawFourState(vec![
-                ScalarValue::One,
-                ScalarValue::Zero,
-                ScalarValue::DontCare,
-            ])])
+            Some(vec![Value::Vector(LogicVec::from(vec![
+                LogicVal::Zero,
+                LogicVal::One,
+                LogicVal::X,
+                LogicVal::Z,
+                LogicVal::DontCare,
+            ]))])
         );
     }
 
@@ -2149,18 +1985,6 @@ mod tests {
         let bad_vector = vec!["01N".to_string()];
         assert_eq!(
             string_array_to_value_array(&bad_vector, ValueType::Vector),
-            None
-        );
-
-        let bad_raw_two_state = vec!["10X".to_string()];
-        assert_eq!(
-            string_array_to_value_array(&bad_raw_two_state, ValueType::RawTwoState),
-            None
-        );
-
-        let bad_raw_four_state = vec!["10?".to_string()];
-        assert_eq!(
-            string_array_to_value_array(&bad_raw_four_state, ValueType::RawFourState),
             None
         );
     }
@@ -2176,8 +2000,8 @@ mod tests {
     #[test]
     fn strength_array_to_value_array_round_trips_through_demotion() {
         let strengths = vec![
-            StrengthValue::new(ScalarValue::One, Strength::StrongDrive, Strength::HiZ),
-            StrengthValue::new(ScalarValue::Zero, Strength::PullDrive, Strength::WeakDrive),
+            StrengthValue::new(LogicVal::One, Strength::StrongDrive, Strength::HiZ),
+            StrengthValue::new(LogicVal::Zero, Strength::PullDrive, Strength::WeakDrive),
         ];
 
         let promoted = strength_array_to_value_array(&strengths);
@@ -2187,28 +2011,8 @@ mod tests {
     }
 
     #[test]
-    fn raw_two_state_display_renders_binary_string() {
-        let value = Value::RawTwoState(vec![true, false, true, true, false]);
-
-        assert_eq!(value.to_string(), "10110");
-    }
-
-    #[test]
-    fn raw_four_state_display_renders_scalar_symbols() {
-        let value = Value::RawFourState(vec![
-            ScalarValue::Zero,
-            ScalarValue::One,
-            ScalarValue::X,
-            ScalarValue::Z,
-            ScalarValue::DontCare,
-        ]);
-
-        assert_eq!(value.to_string(), "01XZ-");
-    }
-
-    #[test]
     fn strength_value_display_renders_logic_and_drive_strengths() {
-        let value = StrengthValue::new(ScalarValue::One, Strength::StrongDrive, Strength::HiZ);
+        let value = StrengthValue::new(LogicVal::One, Strength::StrongDrive, Strength::HiZ);
 
         assert_eq!(value.to_string(), "1 (strong0, highz1)");
     }
@@ -2216,426 +2020,162 @@ mod tests {
     #[test]
     fn scalar_vector_to_string_renders_expected_symbols() {
         let values = vec![
-            ScalarValue::Zero,
-            ScalarValue::One,
-            ScalarValue::X,
-            ScalarValue::Z,
-            ScalarValue::DontCare,
+            LogicVal::Zero,
+            LogicVal::One,
+            LogicVal::X,
+            LogicVal::Z,
+            LogicVal::DontCare,
         ];
 
-        assert_eq!(scalar_vector_to_string(&values), "01XZ-");
-    }
-
-    #[test]
-    fn string_to_scalar_vector_parses_supported_symbols() {
-        let parsed = string_to_scalar_vector("01XZHL-").expect("valid scalar symbols");
-        assert_eq!(
-            parsed,
-            vec![
-                ScalarValue::Zero,
-                ScalarValue::One,
-                ScalarValue::X,
-                ScalarValue::Z,
-                ScalarValue::H,
-                ScalarValue::L,
-                ScalarValue::DontCare,
-            ]
-        );
-    }
-
-    #[test]
-    fn string_to_scalar_vector_accepts_lowercase_letters() {
-        let parsed = string_to_scalar_vector("xzhl".replace(' ', "").as_str())
-            .expect("valid lowercase symbols");
-        assert_eq!(
-            parsed,
-            vec![
-                ScalarValue::X,
-                ScalarValue::Z,
-                ScalarValue::H,
-                ScalarValue::L,
-            ]
-        );
-    }
-
-    #[test]
-    fn string_to_scalar_vector_rejects_invalid_symbols() {
-        assert_eq!(string_to_scalar_vector("012"), None);
-        assert_eq!(string_to_scalar_vector("A"), None);
-        assert_eq!(string_to_scalar_vector("N"), None);
-        assert_eq!(string_to_scalar_vector("n"), None);
+        assert_eq!(LogicVec::from(values).to_string(), "01XZ-");
     }
 
     #[test]
     fn value_type_display_has_human_readable_labels() {
-        assert_eq!(ValueType::RawFourState.to_string(), "Raw Four-State Vector");
         assert_eq!(ValueType::ShortInt.to_string(), "Short Integer");
     }
 
     #[test]
     fn scalar_vector_to_uint64_converts_binary_bits() {
-        let bits = vec![
-            ScalarValue::One,
-            ScalarValue::Zero,
-            ScalarValue::One,
-            ScalarValue::One,
-        ];
+        let bits = vec![LogicVal::One, LogicVal::Zero, LogicVal::One, LogicVal::One];
         assert_eq!(scalar_vector_to_uint64(&bits), Some(0b1011));
     }
 
     #[test]
     fn scalar_vector_to_uint64_all_zeros() {
-        let bits = vec![ScalarValue::Zero; 8];
+        let bits = vec![LogicVal::Zero; 8];
         assert_eq!(scalar_vector_to_uint64(&bits), Some(0));
     }
 
     #[test]
     fn scalar_vector_to_uint64_returns_none_for_x_bit() {
-        let bits = vec![ScalarValue::One, ScalarValue::X, ScalarValue::Zero];
+        let bits = vec![LogicVal::One, LogicVal::X, LogicVal::Zero];
         assert_eq!(scalar_vector_to_uint64(&bits), None);
     }
 
     #[test]
     fn scalar_vector_to_uint64_returns_none_for_z_bit() {
-        let bits = vec![ScalarValue::Zero, ScalarValue::Z];
+        let bits = vec![LogicVal::Zero, LogicVal::Z];
         assert_eq!(scalar_vector_to_uint64(&bits), None);
     }
 
     #[test]
     fn scalar_vector_to_uint64_returns_none_for_over_64_bits() {
-        let bits = vec![ScalarValue::Zero; 65];
+        let bits = vec![LogicVal::Zero; 65];
         assert_eq!(scalar_vector_to_uint64(&bits), None);
     }
 
     #[test]
     fn scalar_vector_to_uint64_accepts_exactly_64_bits() {
-        let mut bits = vec![ScalarValue::Zero; 63];
-        bits.push(ScalarValue::One);
+        let mut bits = vec![LogicVal::Zero; 63];
+        bits.push(LogicVal::One);
         assert_eq!(scalar_vector_to_uint64(&bits), Some(1));
     }
 
-    #[test]
-    fn uint64_to_scalar_vector_converts_value() {
-        assert_eq!(
-            uint64_to_scalar_vector(0b1011, 4),
-            vec![
-                ScalarValue::One,
-                ScalarValue::Zero,
-                ScalarValue::One,
-                ScalarValue::One
-            ]
-        );
-    }
-
-    #[test]
-    fn uint64_to_scalar_vector_pads_with_zeros() {
-        assert_eq!(
-            uint64_to_scalar_vector(0b101, 6),
-            vec![
-                ScalarValue::Zero,
-                ScalarValue::Zero,
-                ScalarValue::Zero,
-                ScalarValue::One,
-                ScalarValue::Zero,
-                ScalarValue::One,
-            ]
-        );
-    }
-
-    #[test]
-    fn uint64_to_scalar_vector_truncates_high_bits() {
-        // Only the lowest 4 bits of 0b11011 should appear
-        assert_eq!(
-            uint64_to_scalar_vector(0b11011, 4),
-            vec![
-                ScalarValue::One,
-                ScalarValue::Zero,
-                ScalarValue::One,
-                ScalarValue::One
-            ]
-        );
-    }
-
-    #[test]
-    fn uint64_to_scalar_vector_zero_bits_returns_empty() {
-        assert_eq!(uint64_to_scalar_vector(42, 0), vec![]);
-    }
-
-    #[test]
-    fn int64_to_scalar_vector_positive_value() {
-        assert_eq!(
-            int64_to_scalar_vector(5, 4),
-            vec![
-                ScalarValue::Zero,
-                ScalarValue::One,
-                ScalarValue::Zero,
-                ScalarValue::One
-            ]
-        );
-    }
-
-    #[test]
-    fn int64_to_scalar_vector_negative_value() {
-        // -1 in 4-bit two's complement is 1111
-        assert_eq!(
-            int64_to_scalar_vector(-1, 4),
-            vec![
-                ScalarValue::One,
-                ScalarValue::One,
-                ScalarValue::One,
-                ScalarValue::One
-            ]
-        );
-    }
-
-    #[test]
-    fn int64_to_scalar_vector_min_negative() {
-        // -8 in 4-bit two's complement is 1000
-        assert_eq!(
-            int64_to_scalar_vector(-8, 4),
-            vec![
-                ScalarValue::One,
-                ScalarValue::Zero,
-                ScalarValue::Zero,
-                ScalarValue::Zero
-            ]
-        );
-    }
-
-    #[test]
-    fn scalar_vector_to_int64_positive() {
-        let bits = vec![
-            ScalarValue::Zero,
-            ScalarValue::One,
-            ScalarValue::Zero,
-            ScalarValue::One,
-        ];
-        assert_eq!(scalar_vector_to_int64(&bits), Some(5));
-    }
-
-    #[test]
-    fn scalar_vector_to_int64_negative() {
-        // 1111 in two's complement is -1
-        let bits = vec![
-            ScalarValue::One,
-            ScalarValue::One,
-            ScalarValue::One,
-            ScalarValue::One,
-        ];
-        assert_eq!(scalar_vector_to_int64(&bits), Some(-1));
-    }
-
-    #[test]
-    fn scalar_vector_to_int64_min_negative() {
-        // 1000 in 4-bit two's complement is -8
-        let bits = vec![
-            ScalarValue::One,
-            ScalarValue::Zero,
-            ScalarValue::Zero,
-            ScalarValue::Zero,
-        ];
-        assert_eq!(scalar_vector_to_int64(&bits), Some(-8));
-    }
-
-    #[test]
-    fn scalar_vector_to_int64_returns_none_for_empty() {
-        assert_eq!(scalar_vector_to_int64(&[]), None);
-    }
-
-    #[test]
-    fn scalar_vector_to_int64_returns_none_for_over_64_bits() {
-        let bits = vec![ScalarValue::Zero; 65];
-        assert_eq!(scalar_vector_to_int64(&bits), None);
-    }
-
-    #[test]
-    fn scalar_vector_to_int64_returns_none_for_x_bit() {
-        let bits = vec![ScalarValue::One, ScalarValue::X];
-        assert_eq!(scalar_vector_to_int64(&bits), None);
-    }
-
-    #[cfg(feature = "bigint")]
-    mod bigint_tests {
-        use num_bigint::{BigInt, BigUint};
-
-        use super::super::{
-            bigint_to_scalar_vector, biguint_to_scalar_vector, scalar_vector_to_bigint,
-            scalar_vector_to_biguint, ScalarValue,
+    #[cfg(feature = "verilator")]
+    mod verilator_tests {
+        use crate::{
+            string_array_to_value_array, value_array_to_string_array, LogicVal, LogicVec, Value,
+            ValueType,
         };
 
         #[test]
-        fn scalar_vector_to_biguint_converts_binary_bits() {
-            let bits = vec![
-                ScalarValue::One,
-                ScalarValue::Zero,
-                ScalarValue::One,
-                ScalarValue::One,
-            ];
+        fn value_array_to_string_array_string_rejects_vector_variants() {
+            let raw_two_state_values = vec![Value::RawTwoState(vec![true, false])];
             assert_eq!(
-                scalar_vector_to_biguint(&bits),
-                Some(BigUint::from(0b1011u32))
+                value_array_to_string_array(&raw_two_state_values, ValueType::String),
+                None
+            );
+
+            let raw_four_state_values = vec![Value::RawFourState(LogicVec::from(vec![
+                LogicVal::One,
+                LogicVal::DontCare,
+            ]))];
+            assert_eq!(
+                value_array_to_string_array(&raw_four_state_values, ValueType::String),
+                None
             );
         }
 
         #[test]
-        fn scalar_vector_to_biguint_all_zeros() {
-            let bits = vec![ScalarValue::Zero; 8];
-            assert_eq!(scalar_vector_to_biguint(&bits), Some(BigUint::ZERO));
-        }
-
-        #[test]
-        fn scalar_vector_to_biguint_empty_slice() {
-            assert_eq!(scalar_vector_to_biguint(&[]), Some(BigUint::ZERO));
-        }
-
-        #[test]
-        fn scalar_vector_to_biguint_returns_none_for_x_bit() {
-            let bits = vec![ScalarValue::One, ScalarValue::X, ScalarValue::Zero];
-            assert_eq!(scalar_vector_to_biguint(&bits), None);
-        }
-
-        #[test]
-        fn scalar_vector_to_biguint_returns_none_for_z_bit() {
-            let bits = vec![ScalarValue::Zero, ScalarValue::Z];
-            assert_eq!(scalar_vector_to_biguint(&bits), None);
-        }
-
-        #[test]
-        fn scalar_vector_to_biguint_exceeds_64_bits() {
-            let mut bits = vec![ScalarValue::Zero; 64];
-            bits.push(ScalarValue::One);
-            // 65-bit value: should still work (no 64-bit limit)
-            assert_eq!(scalar_vector_to_biguint(&bits), Some(BigUint::from(1u32)));
-        }
-
-        #[test]
-        fn biguint_to_scalar_vector_converts_value() {
+        fn value_array_to_string_array_supports_vector_like_formats_directly() {
+            let raw_two_state_values = vec![Value::RawTwoState(vec![true, false, true, true])];
             assert_eq!(
-                biguint_to_scalar_vector(&BigUint::from(0b1011u32), 4),
-                vec![
-                    ScalarValue::One,
-                    ScalarValue::Zero,
-                    ScalarValue::One,
-                    ScalarValue::One
-                ]
+                value_array_to_string_array(&raw_two_state_values, ValueType::RawTwoState),
+                Some(vec!["1011".to_string()])
+            );
+
+            let raw_four_state_values = vec![Value::RawFourState(LogicVec::from(vec![
+                LogicVal::One,
+                LogicVal::Zero,
+                LogicVal::DontCare,
+            ]))];
+            assert_eq!(
+                value_array_to_string_array(&raw_four_state_values, ValueType::RawFourState),
+                Some(vec!["10-".to_string()])
             );
         }
 
         #[test]
-        fn biguint_to_scalar_vector_pads_with_zeros() {
+        fn string_array_to_value_array_supports_vector_like_formats() {
+            let raw_two_state_input = vec!["10110".to_string()];
             assert_eq!(
-                biguint_to_scalar_vector(&BigUint::from(0b101u32), 6),
-                vec![
-                    ScalarValue::Zero,
-                    ScalarValue::Zero,
-                    ScalarValue::Zero,
-                    ScalarValue::One,
-                    ScalarValue::Zero,
-                    ScalarValue::One,
-                ]
+                string_array_to_value_array(&raw_two_state_input, ValueType::RawTwoState),
+                Some(vec![Value::RawTwoState(vec![
+                    true, false, true, true, false
+                ])])
+            );
+
+            let raw_four_state_input = vec!["10-".to_string()];
+            assert_eq!(
+                string_array_to_value_array(&raw_four_state_input, ValueType::RawFourState),
+                Some(vec![Value::RawFourState(LogicVec::from(vec![
+                    LogicVal::One,
+                    LogicVal::Zero,
+                    LogicVal::DontCare,
+                ]))])
             );
         }
 
         #[test]
-        fn biguint_to_scalar_vector_truncates_high_bits() {
-            // Only the lowest 4 bits of 0b11011 should appear
+        fn string_array_to_value_array_rejects_invalid_vector_like_strings() {
+            let bad_raw_two_state = vec!["10X".to_string()];
             assert_eq!(
-                biguint_to_scalar_vector(&BigUint::from(0b11011u32), 4),
-                vec![
-                    ScalarValue::One,
-                    ScalarValue::Zero,
-                    ScalarValue::One,
-                    ScalarValue::One
-                ]
+                string_array_to_value_array(&bad_raw_two_state, ValueType::RawTwoState),
+                None
+            );
+
+            let bad_raw_four_state = vec!["10?".to_string()];
+            assert_eq!(
+                string_array_to_value_array(&bad_raw_four_state, ValueType::RawFourState),
+                None
             );
         }
 
         #[test]
-        fn biguint_to_scalar_vector_zero_bits_returns_empty() {
-            assert_eq!(biguint_to_scalar_vector(&BigUint::from(42u32), 0), vec![]);
+        fn raw_two_state_display_renders_binary_string() {
+            let value = Value::RawTwoState(vec![true, false, true, true, false]);
+
+            assert_eq!(value.to_string(), "10110");
         }
 
         #[test]
-        fn biguint_to_scalar_vector_exceeds_64_bits() {
-            let value = BigUint::from(1u32) << 64u32;
-            let mut expected = vec![ScalarValue::One];
-            expected.extend(vec![ScalarValue::Zero; 64]);
-            assert_eq!(biguint_to_scalar_vector(&value, 65), expected);
+        fn raw_four_state_display_renders_scalar_symbols() {
+            let value = Value::RawFourState(LogicVec::from(vec![
+                LogicVal::Zero,
+                LogicVal::One,
+                LogicVal::X,
+                LogicVal::Z,
+                LogicVal::DontCare,
+            ]));
+
+            assert_eq!(value.to_string(), "01XZ-");
         }
 
         #[test]
-        fn bigint_to_scalar_vector_positive_value() {
-            assert_eq!(
-                bigint_to_scalar_vector(&BigInt::from(5), 4),
-                vec![
-                    ScalarValue::Zero,
-                    ScalarValue::One,
-                    ScalarValue::Zero,
-                    ScalarValue::One
-                ]
-            );
-        }
-
-        #[test]
-        fn bigint_to_scalar_vector_negative_one() {
-            // -1 in 4-bit two's complement is 1111
-            assert_eq!(
-                bigint_to_scalar_vector(&BigInt::from(-1), 4),
-                vec![
-                    ScalarValue::One,
-                    ScalarValue::One,
-                    ScalarValue::One,
-                    ScalarValue::One
-                ]
-            );
-        }
-
-        #[test]
-        fn bigint_to_scalar_vector_large_negative() {
-            // -1 in 65-bit two's complement: all ones
-            let expected = vec![ScalarValue::One; 65];
-            assert_eq!(bigint_to_scalar_vector(&BigInt::from(-1), 65), expected);
-        }
-
-        #[test]
-        fn scalar_vector_to_bigint_positive() {
-            let bits = vec![
-                ScalarValue::Zero,
-                ScalarValue::One,
-                ScalarValue::Zero,
-                ScalarValue::One,
-            ];
-            assert_eq!(scalar_vector_to_bigint(&bits), Some(BigInt::from(5)));
-        }
-
-        #[test]
-        fn scalar_vector_to_bigint_negative_one() {
-            // 1111 in 4-bit two's complement is -1
-            let bits = vec![
-                ScalarValue::One,
-                ScalarValue::One,
-                ScalarValue::One,
-                ScalarValue::One,
-            ];
-            assert_eq!(scalar_vector_to_bigint(&bits), Some(BigInt::from(-1)));
-        }
-
-        #[test]
-        fn scalar_vector_to_bigint_large_negative() {
-            // 65 ones = -1 in 65-bit two's complement
-            let bits = vec![ScalarValue::One; 65];
-            assert_eq!(scalar_vector_to_bigint(&bits), Some(BigInt::from(-1)));
-        }
-
-        #[test]
-        fn scalar_vector_to_bigint_returns_none_for_empty() {
-            assert_eq!(scalar_vector_to_bigint(&[]), None);
-        }
-
-        #[test]
-        fn scalar_vector_to_bigint_returns_none_for_x_bit() {
-            let bits = vec![ScalarValue::One, ScalarValue::X];
-            assert_eq!(scalar_vector_to_bigint(&bits), None);
+        fn value_type_display_has_human_readable_labels() {
+            assert_eq!(ValueType::RawFourState.to_string(), "Raw Four-State Vector");
+            assert_eq!(ValueType::ShortInt.to_string(), "Short Integer");
         }
     }
 }
