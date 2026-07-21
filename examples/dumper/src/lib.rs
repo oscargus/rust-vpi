@@ -28,7 +28,8 @@ fn value_change_cb(cb_data: &CbData) {
     let value = sig
         .get_value(ValueType::ObjType)
         .unwrap_or(Value::String("<unknown>".to_string()));
-    printf!("Value change on signal {name}: {value}");
+    let type_ = sig.get_type();
+    printf!("Value change on signal {name} ({type_:?}): {value:?}");
 }
 
 fn walk_hierarchy(handle: &Handle, indent: usize) {
@@ -56,8 +57,9 @@ fn walk_hierarchy(handle: &Handle, indent: usize) {
         let direction = signal
             .get_direction()
             .unwrap_or(vpi::Direction::NoDirection);
+        let type_ = signal.get_type();
         printf!(
-            "{}Signal: {name} ({signal_type}, {direction})",
+            "{}Signal: {name} ({signal_type}, {direction}, {type_:?})",
             " ".repeat(indent + 1)
         );
     }
@@ -76,7 +78,11 @@ fn walk_hierarchy(handle: &Handle, indent: usize) {
         let signal_type = signal
             .get_str(Property::Type)
             .unwrap_or("<unknown>".to_string());
-        printf!("{}Signal: {name} ({signal_type})", " ".repeat(indent + 1));
+        let type_ = signal.get_type();
+        printf!(
+            "{}Signal: {name} ({signal_type}, {type_:?})",
+            " ".repeat(indent + 1)
+        );
         signal.register_cb(CbReason::ValueChange, value_change_cb);
     }
 

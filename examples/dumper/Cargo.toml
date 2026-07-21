@@ -12,4 +12,4 @@ test = false
 doctest = false
 
 [dependencies]
-vpi = { workspace = true, features = ["dynamic"] }
+vpi = { workspace = true, features = ["dynamic", "sv"] }

@@ -803,6 +803,22 @@ impl OpType {
 }
 
 impl Handle {
+    /// Reads a numeric property using `vpi_get` and returns it as `PLI_INT32`.
+    ///
+    /// Returns `None` for null handles.
+    ///
+    /// To obtain specific types like `u32`, `u64`, or `i64`, use the corresponding methods: `get_u32`, `get_u64`, or `get_i64`.
+    ///
+    /// To obtain other types use the corresponding methods.
+    #[must_use]
+    pub fn get_property(&self, property: Property) -> Option<PLI_INT32> {
+        if self.is_null() {
+            return None;
+        }
+        let value = unsafe { vpi_sys::vpi_get(property as PLI_INT32, self.as_raw()) };
+        Some(value)
+    }
+
     /// Reads a numeric property using `vpi_get64` and returns it as `i64`.
     ///
     /// Returns `None` for null handles.
@@ -965,6 +981,12 @@ impl Handle {
         TchkType::from_u32(value as u32)
     }
 
+    /// Returns this object's size, i.e., number of elements, if available.
+    #[must_use]
+    pub fn get_size(&self) -> Option<u32> {
+        self.get_u32(Property::Size)
+    }
+
     /// Returns this object's constant subtype, if available.
     #[must_use]
     pub fn get_const_type(&self) -> Option<ConstType> {
@@ -1031,6 +1053,13 @@ impl Handle {
         }
         let value = unsafe { vpi_sys::vpi_get(Property::Type as PLI_INT32, self.as_raw()) };
         ObjectType::from_u32(value as u32)
+    }
+
+    /// Returns this object's type name, if available.
+    #[must_use]
+    #[inline]
+    pub fn get_type_name(&self) -> Option<String> {
+        self.get_str(Property::Type)
     }
 
     /// Returns this object's index value, if available.
