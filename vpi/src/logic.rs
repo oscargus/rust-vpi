@@ -61,7 +61,7 @@ impl From<LogicVal> for char {
 ///  ^MSB                                           ^LSB
 /// ```
 ///
-/// # Creating a LogicVec
+/// # Creating a `LogicVec`
 ///
 /// There are several ways to create a `LogicVec`:
 ///
@@ -135,7 +135,6 @@ impl LogicVec {
     /// let ones: usize = vec.iter().filter(|b| matches!(b, LogicVal::One)).count();
     /// assert_eq!(ones, 2);
     /// ```
-    #[must_use]
     pub fn iter(&self) -> impl Iterator<Item = &LogicVal> {
         self.data.iter()
     }
@@ -224,6 +223,7 @@ impl LogicVec {
     /// assert!(LogicVec::try_from_str("1011").is_some());
     /// assert!(LogicVec::try_from_str("10AB").is_none()); // 'A' and 'B' are invalid
     /// ```
+    #[must_use]
     pub fn try_from_str(s: &str) -> Option<Self> {
         let mut bits = Vec::with_capacity(s.len());
         for c in s.chars() {
@@ -421,6 +421,7 @@ impl LogicVec {
     }
 
     /// Returns a `Value` representing this vector as a VPI vector value.
+    #[must_use]
     pub fn as_vector_value(&self) -> Value {
         Value::Vector(self.clone())
     }

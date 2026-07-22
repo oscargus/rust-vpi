@@ -4,6 +4,9 @@ use vpi_sys::PLI_INT32;
 
 use crate::{Handle, ObjectType, Value, ValueType};
 
+#[cfg(feature = "sv")]
+use crate::HandleIterator;
+
 /// VPI property identifiers used with `vpi_get` and `vpi_get_str`.
 ///
 /// Values map directly to `vpi_sys::vpi*` property constants.
@@ -332,8 +335,8 @@ impl std::fmt::Display for Direction {
             Direction::Input => write!(f, "Input"),
             Direction::Output => write!(f, "Output"),
             Direction::Inout => write!(f, "Inout"),
-            Direction::MixedIO => write!(f, "MixedIO"),
-            Direction::NoDirection => write!(f, "NoDirection"),
+            Direction::MixedIO => write!(f, "Mixed IO"),
+            Direction::NoDirection => write!(f, "No direction"),
         }
     }
 }
@@ -355,6 +358,26 @@ pub enum NetType {
     Supply1 = vpi_sys::vpiSupply1,
     None = vpi_sys::vpiNone,
     UWire = vpi_sys::vpiUwire,
+}
+
+impl std::fmt::Display for NetType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            NetType::Wire => write!(f, "wire"),
+            NetType::Wand => write!(f, "wand"),
+            NetType::Wor => write!(f, "wor"),
+            NetType::Tri => write!(f, "tri"),
+            NetType::Tri0 => write!(f, "tri0"),
+            NetType::Tri1 => write!(f, "tri1"),
+            NetType::TriReg => write!(f, "trireg"),
+            NetType::TriAnd => write!(f, "triand"),
+            NetType::TriOr => write!(f, "trior"),
+            NetType::Supply0 => write!(f, "supply0"),
+            NetType::Supply1 => write!(f, "supply1"),
+            NetType::None => write!(f, "none"),
+            NetType::UWire => write!(f, "uwire"),
+        }
+    }
 }
 
 bitflags::bitflags! {
@@ -444,6 +467,168 @@ pub enum DistType {
     Div = vpi_sys::vpiDivDist,
 }
 
+#[cfg(feature = "sv")]
+#[repr(u32)]
+#[derive(FromPrimitive, ToPrimitive, Copy, Clone, Debug, PartialEq, Eq)]
+/// SystemVerilog type specification kind, returned by [`Handle::get_typespec`].
+///
+/// Values correspond to the `vpiType` of a typespec object obtained via
+/// `vpi_handle(vpiTypespec, h)`.
+pub enum Typespec {
+    /// long int type specification
+    LongInt = vpi_sys::vpiLongIntTypespec,
+    /// short real type specification
+    ShortReal = vpi_sys::vpiShortRealTypespec,
+    /// byte type specification
+    Byte = vpi_sys::vpiByteTypespec,
+    /// short int type specification
+    ShortInt = vpi_sys::vpiShortIntTypespec,
+    /// int type specification
+    Int = vpi_sys::vpiIntTypespec,
+    /// class type specification
+    Class = vpi_sys::vpiClassTypespec,
+    /// string type specification
+    String = vpi_sys::vpiStringTypespec,
+    /// chandle type specification
+    Chandle = vpi_sys::vpiChandleTypespec,
+    /// enumeration type specification
+    Enum = vpi_sys::vpiEnumTypespec,
+    /// integer type specification
+    Integer = vpi_sys::vpiIntegerTypespec,
+    /// time type specification
+    Time = vpi_sys::vpiTimeTypespec,
+    /// real type specification
+    Real = vpi_sys::vpiRealTypespec,
+    /// struct type specification
+    Struct = vpi_sys::vpiStructTypespec,
+    /// union type specification
+    Union = vpi_sys::vpiUnionTypespec,
+    /// bit type specification
+    Bit = vpi_sys::vpiBitTypespec,
+    /// logic type specification
+    Logic = vpi_sys::vpiLogicTypespec,
+    /// array type specification
+    Array = vpi_sys::vpiArrayTypespec,
+    /// void type specification
+    Void = vpi_sys::vpiVoidTypespec,
+    /// packed array type specification
+    PackedArray = vpi_sys::vpiPackedArrayTypespec,
+    /// sequence type specification
+    Sequence = vpi_sys::vpiSequenceTypespec,
+    /// property type specification
+    Property = vpi_sys::vpiPropertyTypespec,
+    /// event type specification
+    Event = vpi_sys::vpiEventTypespec,
+    /// interface type specification
+    Interface = vpi_sys::vpiInterfaceTypespec,
+}
+
+/// Variable kind, obtained by reading `vpiType` on a variable handle.
+///
+/// Covers both classic Verilog variable types and `SystemVerilog` additions
+/// (the latter gated by the `sv` feature).
+#[repr(u32)]
+#[derive(FromPrimitive, ToPrimitive, Copy, Clone, Debug, PartialEq, Eq)]
+pub enum VarType {
+    /// net variable (`wire`, `wand`, `wor`, `tri`, etc.)
+    Net = vpi_sys::vpiNet,
+    /// integer variable (`integer`)
+    Integer = vpi_sys::vpiIntegerVar,
+    /// real variable (`real`)
+    Real = vpi_sys::vpiRealVar,
+    /// time variable (`time`)
+    Time = vpi_sys::vpiTimeVar,
+    /// logic / reg variable (`logic` / `reg`)
+    Logic = vpi_sys::vpiReg,
+    /// unpacked reg array variable
+    Array = vpi_sys::vpiRegArray,
+    /// generate variable (`genvar`)
+    GenVar = vpi_sys::vpiGenVar,
+    #[cfg(feature = "sv")]
+    /// long int variable (`longint`)
+    LongInt = vpi_sys::vpiLongIntVar,
+    #[cfg(feature = "sv")]
+    /// short int variable (`shortint`)
+    ShortInt = vpi_sys::vpiShortIntVar,
+    #[cfg(feature = "sv")]
+    /// int variable (`int`)
+    Int = vpi_sys::vpiIntVar,
+    #[cfg(feature = "sv")]
+    /// short real variable (`shortreal`)
+    ShortReal = vpi_sys::vpiShortRealVar,
+    #[cfg(feature = "sv")]
+    /// byte variable (`byte`)
+    Byte = vpi_sys::vpiByteVar,
+    #[cfg(feature = "sv")]
+    /// class variable
+    Class = vpi_sys::vpiClassVar,
+    #[cfg(feature = "sv")]
+    /// string variable (`string`)
+    String = vpi_sys::vpiStringVar,
+    #[cfg(feature = "sv")]
+    /// enumeration variable
+    Enum = vpi_sys::vpiEnumVar,
+    #[cfg(feature = "sv")]
+    /// struct variable
+    Struct = vpi_sys::vpiStructVar,
+    #[cfg(feature = "sv")]
+    /// union variable
+    Union = vpi_sys::vpiUnionVar,
+    #[cfg(feature = "sv")]
+    /// bit variable (`bit`)
+    Bit = vpi_sys::vpiBitVar,
+    #[cfg(feature = "sv")]
+    /// chandle variable (`chandle`)
+    Chandle = vpi_sys::vpiChandleVar,
+    #[cfg(feature = "sv")]
+    /// packed array variable
+    PackedArray = vpi_sys::vpiPackedArrayVar,
+    #[cfg(feature = "sv")]
+    /// virtual interface variable
+    VirtualInterface = vpi_sys::vpiVirtualInterfaceVar,
+}
+
+impl std::fmt::Display for VarType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            VarType::Net => write!(f, "net"),
+            VarType::Integer => write!(f, "integer"),
+            VarType::Real => write!(f, "real"),
+            VarType::Time => write!(f, "time"),
+            VarType::Logic => write!(f, "logic"),
+            VarType::Array => write!(f, "array"),
+            VarType::GenVar => write!(f, "genvar"),
+            #[cfg(feature = "sv")]
+            VarType::LongInt => write!(f, "longint"),
+            #[cfg(feature = "sv")]
+            VarType::ShortInt => write!(f, "shortint"),
+            #[cfg(feature = "sv")]
+            VarType::Int => write!(f, "int"),
+            #[cfg(feature = "sv")]
+            VarType::ShortReal => write!(f, "shortreal"),
+            #[cfg(feature = "sv")]
+            VarType::Byte => write!(f, "byte"),
+            #[cfg(feature = "sv")]
+            VarType::Class => write!(f, "class"),
+            #[cfg(feature = "sv")]
+            VarType::String => write!(f, "string"),
+            #[cfg(feature = "sv")]
+            VarType::Enum => write!(f, "enum"),
+            #[cfg(feature = "sv")]
+            VarType::Struct => write!(f, "struct"),
+            #[cfg(feature = "sv")]
+            VarType::Union => write!(f, "union"),
+            #[cfg(feature = "sv")]
+            VarType::Bit => write!(f, "bit"),
+            #[cfg(feature = "sv")]
+            VarType::Chandle => write!(f, "chandle"),
+            #[cfg(feature = "sv")]
+            VarType::PackedArray => write!(f, "packed array"),
+            #[cfg(feature = "sv")]
+            VarType::VirtualInterface => write!(f, "virtual interface"),
+        }
+    }
+}
 /// Primitive instance subtype.
 #[repr(u32)]
 #[derive(FromPrimitive, ToPrimitive, Debug, Clone, PartialEq, Eq)]
@@ -1203,6 +1388,159 @@ impl Handle {
             return Vec::new();
         }
         self.iterator(ObjectType::DistItem).collect()
+    }
+
+    #[cfg(feature = "sv")]
+    /// Returns the typespec kind associated with this object, if any.
+    ///
+    /// Calls `vpi_handle(vpiTypespec, h)` to obtain the typespec object and
+    /// then reads its `vpiType` property to determine the concrete typespec
+    /// variant.
+    #[must_use]
+    pub fn get_typespec(&self) -> Option<Typespec> {
+        if self.is_null() {
+            return None;
+        }
+        let ts = self.get(ObjectType::Typespec);
+        if ts.is_null() {
+            return None;
+        }
+        let raw = unsafe { vpi_sys::vpi_get(Property::Type as PLI_INT32, ts.as_raw()) };
+        Typespec::from_u32(raw as u32)
+    }
+
+    #[cfg(feature = "sv")]
+    /// Iterates class/struct members reachable from this object.
+    #[must_use]
+    pub fn member_iterator(&self) -> HandleIterator {
+        if self.is_null() {
+            return HandleIterator {
+                iter: Handle::default(),
+            };
+        }
+        self.iterator(ObjectType::Member)
+    }
+
+    /// Returns a human-readable type name for this object.
+    ///
+    /// Resolution order:
+    /// 1. **Port unwrapping** — if the object is a [`ObjectType::Port`] or
+    ///    [`ObjectType::PortBit`], follows `vpiLowConn` (the internal signal)
+    ///    to obtain the underlying net or variable, then applies the remaining
+    ///    steps to that handle. Falls back to `vpiHighConn` when `vpiLowConn`
+    ///    is absent.
+    /// 2. **`sv` feature only** — retrieves the associated typespec handle via
+    ///    `vpi_handle(vpiTypespec, h)` and returns its `DefName` (user-defined
+    ///    types such as structs, enums, typedefs) or `Name` if `DefName` is
+    ///    absent.
+    /// 3. Attempts to classify the object as a known [`VarType`] and returns
+    ///    its [`Display`](std::fmt::Display) string (e.g. `"logic"`, `"int"`).
+    /// 4. Falls back to `vpi_get_str(vpiType, h)` which returns the raw VPI
+    ///    object-type string (e.g. `"vpiNet"`, `"vpiReg"`).
+    ///
+    /// Returns `None` for null handles or when none of the above produce a
+    /// valid string.
+    #[must_use]
+    pub fn get_type_name(&self) -> Option<String> {
+        if self.is_null() {
+            return None;
+        }
+
+        // Unwrap port handles to their underlying signal before inspecting type.
+        if self.is_port() {
+            // 1. Follow the internal connection (works in many simulators).
+            let inner = self.get(ObjectType::LowConn);
+            let inner = if inner.is_null() {
+                self.get(ObjectType::HighConn)
+            } else {
+                inner
+            };
+            if !inner.is_null() {
+                return inner.get_type_name();
+            }
+
+            // 2. Look up the net/reg with the same name in the parent scope.
+            //    Icarus Verilog doesn't populate LowConn/HighConn, but the
+            //    underlying signal always shares the port's name in the module.
+            if let Some(port_name) = self.get_name() {
+                let scope = self.get(ObjectType::Scope);
+                let net = Handle::handle_by_name_and_scope(&port_name, &scope);
+                if !net.is_null() {
+                    return net.get_type_name();
+                }
+            }
+
+            // 3. Read the net subtype directly from the port object.
+            let raw = unsafe { vpi_sys::vpi_get(Property::NetType as PLI_INT32, self.as_raw()) };
+            if let Some(net_type) = NetType::from_u32(raw as u32) {
+                return Some(net_type.to_string());
+            }
+
+            // All port-specific paths exhausted; return None rather than
+            // the unhelpful "vpiPort" string.
+            return None;
+        }
+
+        #[cfg(feature = "sv")]
+        {
+            let ts = self.get(ObjectType::Typespec);
+            if !ts.is_null() {
+                if let name @ Some(_) = ts.get_str(Property::DefName) {
+                    return name;
+                }
+                if let name @ Some(_) = ts.get_str(Property::Name) {
+                    return name;
+                }
+            }
+        }
+        if let Some(var_type) = self.get_var_type() {
+            return Some(var_type.to_string());
+        }
+        self.get_str(Property::Type)
+    }
+
+    /// Returns this object's variable kind, if the handle refers to a variable.
+    ///
+    /// Reads `vpiType` and maps the result to a [`VarType`] variant.
+    /// Returns `None` for null handles or non-variable object types.
+    #[must_use]
+    pub fn get_var_type(&self) -> Option<VarType> {
+        if self.is_null() {
+            return None;
+        }
+        let raw = unsafe { vpi_sys::vpi_get(Property::Type as PLI_INT32, self.as_raw()) };
+        VarType::from_u32(raw as u32)
+    }
+
+    /// Returns this object's size, i.e., number of elements, if available.
+    #[must_use]
+    pub fn get_size(&self) -> Option<u32> {
+        self.get_u32(Property::Size)
+    }
+
+    /// Reads a numeric property using `vpi_get` and returns it as `PLI_INT32`.
+    ///
+    /// Returns `None` for null handles.
+    ///
+    /// To obtain specific types like `u32`, `u64`, or `i64`, use the corresponding methods: `get_u32`, `get_u64`, or `get_i64`.
+    ///
+    /// To obtain other types use the corresponding methods.
+    #[must_use]
+    pub fn get_raw_property(&self, property: Property) -> Option<PLI_INT32> {
+        if self.is_null() {
+            return None;
+        }
+        let value = unsafe { vpi_sys::vpi_get(property as PLI_INT32, self.as_raw()) };
+        Some(value)
+    }
+
+    /// Returns true if this object is a port or port bit.
+    #[must_use]
+    pub fn is_port(&self) -> bool {
+        matches!(
+            self.get_type(),
+            Some(ObjectType::Port | ObjectType::PortBit)
+        )
     }
 }
 
