@@ -71,7 +71,7 @@ pub struct VPIError {
 
 impl std::fmt::Display for VPIError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let severity_str = self.severity.as_ref().map(|s| s.to_string());
+        let severity_str = self.severity.as_ref().map(std::string::ToString::to_string);
         write!(
             f,
             "[{}] {} ({}:{}) - {}",

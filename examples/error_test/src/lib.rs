@@ -16,7 +16,7 @@ fn error_callback(data: &CbData) {
     if let Ok(mut msgs) = ERROR_MESSAGES.lock() {
         msgs.push(message.clone());
     }
-    eprintln!("[ERROR_TEST VPI] {}", message);
+    eprintln!("[ERROR_TEST VPI] {message}");
 }
 
 fn pli_error_callback(data: &CbData) {
@@ -25,17 +25,14 @@ fn pli_error_callback(data: &CbData) {
     if let Ok(mut msgs) = ERROR_MESSAGES.lock() {
         msgs.push(message.clone());
     }
-    eprintln!("[ERROR_TEST VPI] {}", message);
+    eprintln!("[ERROR_TEST VPI] {message}");
 }
 
 fn end_of_simulation_callback(_data: &CbData) {
     let count = ERROR_COUNT.load(Ordering::SeqCst);
     let messages = ERROR_MESSAGES.lock().unwrap();
 
-    eprintln!(
-        "[ERROR_TEST VPI] Simulation ended. Total errors captured: {}",
-        count
-    );
+    eprintln!("[ERROR_TEST VPI] Simulation ended. Total errors captured: {count}");
     for (i, msg) in messages.iter().enumerate() {
         eprintln!("[ERROR_TEST VPI] Error {}: {}", i + 1, msg);
     }

@@ -173,7 +173,7 @@ fn normalize_vector_roundtrip_scalar(value: LogicVal) -> LogicVal {
 }
 
 fn normalized_scalar_string(bits: &str) -> Option<String> {
-    let values = LogicVec::try_from(bits).ok()?;
+    let values = LogicVec::try_from_str(bits)?;
     let values: Vec<LogicVal> = values
         .iter()
         .copied()
@@ -183,7 +183,7 @@ fn normalized_scalar_string(bits: &str) -> Option<String> {
 }
 
 fn inverted_scalar_string(bits: &str) -> Option<String> {
-    let values = LogicVec::try_from(bits).ok()?;
+    let values = LogicVec::try_from_str(bits)?;
     let values: Vec<LogicVal> = values
         .iter()
         .copied()

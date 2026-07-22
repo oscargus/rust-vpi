@@ -22,9 +22,7 @@ fn end_of_simulation(_cb_data: &CbData) {
 
 fn value_change_cb(cb_data: &CbData) {
     let sig = &cb_data.obj;
-    let name = sig
-        .get_str(Property::Name)
-        .unwrap_or("<unnamed>".to_string());
+    let name = sig.get_name().unwrap_or("<unnamed>".to_string());
     let value = sig
         .get_value(ValueType::ObjType)
         .unwrap_or(Value::String("<unknown>".to_string()));
@@ -33,9 +31,7 @@ fn value_change_cb(cb_data: &CbData) {
 
 fn walk_hierarchy(handle: &Handle, indent: usize) {
     if !handle.is_null() {
-        let name = handle
-            .get_str(Property::Name)
-            .unwrap_or("<unnamed>".to_string());
+        let name = handle.get_name().unwrap_or("<unnamed>".to_string());
         printf!("{}Module: {name}", " ".repeat(indent));
     }
     if handle.get_bool(Property::TopModule).unwrap_or(false) {
@@ -50,9 +46,7 @@ fn walk_hierarchy(handle: &Handle, indent: usize) {
     printf!("{}=======", " ".repeat(indent + 1));
     for signal in handle.iterators(&[ObjectType::Port]) {
         let name = signal.get_name().unwrap_or("<unnamed>".to_string());
-        let signal_type = signal
-            .get_str(Property::Type)
-            .unwrap_or("<unknown>".to_string());
+        let signal_type = signal.get_type_name().unwrap_or("<unknown>".to_string());
         let direction = signal
             .get_direction()
             .unwrap_or(vpi::Direction::NoDirection);
@@ -70,20 +64,14 @@ fn walk_hierarchy(handle: &Handle, indent: usize) {
         ObjectType::Variables,
         ObjectType::Parameter,
     ]) {
-        let name = signal
-            .get_str(Property::Name)
-            .unwrap_or("<unnamed>".to_string());
-        let signal_type = signal
-            .get_str(Property::Type)
-            .unwrap_or("<unknown>".to_string());
+        let name = signal.get_name().unwrap_or("<unnamed>".to_string());
+        let signal_type = signal.get_type_name().unwrap_or("<unknown>".to_string());
         printf!("{}Signal: {name} ({signal_type})", " ".repeat(indent + 1));
         signal.register_cb(CbReason::ValueChange, value_change_cb);
     }
 
     for memory in handle.iterator(ObjectType::Memory) {
-        let name = memory
-            .get_str(Property::Name)
-            .unwrap_or("<unnamed>".to_string());
+        let name = memory.get_name().unwrap_or("<unnamed>".to_string());
         printf!("{}Memory: {name}", " ".repeat(indent + 1));
         for word in memory.iterator(ObjectType::MemoryWord) {
             word.register_cb(CbReason::ValueChange, value_change_cb);

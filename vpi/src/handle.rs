@@ -69,13 +69,31 @@ impl Handle {
 
     /// Looks up a handle by hierarchical name.
     ///
-    /// Returns a null handle when the object is not found.
+    /// Wraps `vpi_handle_by_name`. Pass a null handle as `scope` to resolve
+    /// against the root (absolute hierarchical names). Returns a null handle
+    /// when the name cannot be resolved.
     #[must_use]
     pub fn handle_by_name(name: &str) -> Self {
-        let c_name = std::ffi::CString::new(name).expect("CString::new failed");
-        let handle = unsafe {
-            vpi_sys::vpi_handle_by_name(c_name.as_ptr().cast_mut(), std::ptr::null_mut())
+        Self::handle_by_name_and_scope(name, &Handle::null())
+    }
+
+    /// Returns a handle located by name within a scope.
+    ///
+    /// Passing `Handle::null()` as the `scope` will resolve the name against the root of the hierarchy.
+    ///
+    /// Returns a null handle when the object is not found.
+    #[must_use]
+    pub fn handle_by_name_and_scope(name: &str, scope: &Handle) -> Self {
+        let Ok(c_name) = std::ffi::CString::new(name) else {
+            return Self::null();
         };
+        let scope_raw = if scope.is_null() {
+            std::ptr::null_mut()
+        } else {
+            scope.as_raw()
+        };
+        let handle =
+            unsafe { vpi_sys::vpi_handle_by_name(c_name.as_ptr().cast_mut().cast(), scope_raw) };
         Self::from_raw(handle)
     }
 
