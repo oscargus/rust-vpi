@@ -209,7 +209,7 @@ pub enum CbReason {
 }
 
 /// Safe callback data passed to Rust closures.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CbData {
     /// Callback reason.
     pub reason: CbReason,
@@ -327,7 +327,7 @@ struct AssertionCallbackState {
 
 /// Safe callback data passed to SystemVerilog assertion callbacks.
 #[cfg(feature = "sv")]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct AssertionCbData {
     /// Callback reason.
     pub reason: CbReason,
@@ -341,7 +341,7 @@ pub struct AssertionCbData {
 
 /// Decoded step-transition details for assertion step callbacks.
 #[cfg(feature = "sv")]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct AssertionStepInfo {
     /// Matched expression handles provided by the simulator.
     pub matched_exprs: Vec<Handle>,
@@ -353,7 +353,7 @@ pub struct AssertionStepInfo {
 
 /// Decoded union payload from `t_vpi_attempt_info.detail`.
 #[cfg(feature = "sv")]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum AssertionAttemptDetail {
     /// Failure expression handle.
     FailExpr(Handle),
@@ -363,7 +363,7 @@ pub enum AssertionAttemptDetail {
 
 /// Safe wrapper for `t_vpi_attempt_info`.
 #[cfg(feature = "sv")]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct AssertionAttemptInfo {
     /// Union payload interpreted according to callback reason.
     pub detail: AssertionAttemptDetail,

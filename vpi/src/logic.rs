@@ -1,32 +1,77 @@
 use std::fmt::Display;
 
-use num_derive::{FromPrimitive, ToPrimitive};
-
 use crate::Value;
 
-#[repr(u32)]
-#[derive(FromPrimitive, ToPrimitive, Copy, Clone, Debug, PartialEq)]
+/* TODO: Replace with this version on next major version update
+#[repr(u8)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 /// 4-state scalar encodings used by VPI.
 pub enum LogicVal {
     /// Logic `0`.
-    Zero = vpi_sys::vpi0,
+    Zero = vpi_sys::vpi0 as u8,
     /// Logic `1`.
-    One = vpi_sys::vpi1,
+    One = vpi_sys::vpi1 as u8,
     /// High-impedance state.
-    Z = vpi_sys::vpiZ,
+    Z = vpi_sys::vpiZ as u8,
     /// Unknown logic state.
-    X = vpi_sys::vpiX,
+    X = vpi_sys::vpiX as u8,
     /// Weak high state.
-    H = vpi_sys::vpiH,
+    H = vpi_sys::vpiH as u8,
     /// Weak low state.
-    L = vpi_sys::vpiL,
+    L = vpi_sys::vpiL as u8,
     /// Don't-care state.
-    DontCare = vpi_sys::vpiDontCare,
+    DontCare = vpi_sys::vpiDontCare as u8,
+}
+*/
+
+#[repr(u32)]
+#[derive(Copy, Clone, Debug, PartialEq)]
+/// 4-state scalar encodings used by VPI.
+pub enum LogicVal {
+    /// Logic `0`.
+    Zero = vpi_sys::vpi0 as u32,
+    /// Logic `1`.
+    One = vpi_sys::vpi1 as u32,
+    /// High-impedance state.
+    Z = vpi_sys::vpiZ as u32,
+    /// Unknown logic state.
+    X = vpi_sys::vpiX as u32,
+    /// Weak high state.
+    H = vpi_sys::vpiH as u32,
+    /// Weak low state.
+    L = vpi_sys::vpiL as u32,
+    /// Don't-care state.
+    DontCare = vpi_sys::vpiDontCare as u32,
 }
 
 impl Display for LogicVal {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", char::from(*self))
+    }
+}
+
+impl TryFrom<u32> for LogicVal {
+    type Error = ();
+
+    fn try_from(value: u32) -> Result<Self, Self::Error> {
+        match value {
+            vpi_sys::vpi0 => Ok(LogicVal::Zero),
+            vpi_sys::vpi1 => Ok(LogicVal::One),
+            vpi_sys::vpiZ => Ok(LogicVal::Z),
+            vpi_sys::vpiX => Ok(LogicVal::X),
+            vpi_sys::vpiH => Ok(LogicVal::H),
+            vpi_sys::vpiL => Ok(LogicVal::L),
+            vpi_sys::vpiDontCare => Ok(LogicVal::DontCare),
+            _ => Err(()),
+        }
+    }
+}
+
+impl TryFrom<u8> for LogicVal {
+    type Error = ();
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        Self::try_from(value as u32)
     }
 }
 
@@ -40,6 +85,20 @@ impl From<LogicVal> for char {
             LogicVal::H => 'H',
             LogicVal::L => 'L',
             LogicVal::DontCare => '-',
+        }
+    }
+}
+
+impl From<LogicVal> for u8 {
+    fn from(logic: LogicVal) -> Self {
+        match logic {
+            LogicVal::Zero => b'0',
+            LogicVal::One => b'1',
+            LogicVal::X => b'x',
+            LogicVal::Z => b'z',
+            LogicVal::H => b'h',
+            LogicVal::L => b'l',
+            LogicVal::DontCare => b'-',
         }
     }
 }
@@ -249,6 +308,50 @@ impl LogicVec {
     pub(crate) fn from_vecval(vecvals: &[vpi_sys::t_vpi_vecval], size: usize) -> Self {
         let data = vector_value_to_scalar_vector(vecvals, size);
         Self { data }
+    }
+
+    /// Returns a vector of bytes representing the VCD value of this `LogicVec`.
+    ///
+    /// The returned vector starts with 'b' and the value is trimmed of leading
+    /// 'x', 'z', and '0' characters specified by the Verilog standard.
+    #[must_use]
+    pub fn as_vcd_value(&self) -> Vec<u8> {
+        if self.data.is_empty() {
+            return vec![b'b'];
+        }
+
+        let mut skip = 0;
+        let len = self.data.len();
+        let threshold = len - 1;
+
+        // Skip leading 'x' characters if followed by another 'x'.
+        while skip < threshold
+            && self.data[skip] == LogicVal::X
+            && self.data[skip + 1] == LogicVal::X
+        {
+            skip += 1;
+        }
+
+        // Skip leading 'z' characters if followed by another 'z'.
+        while skip < threshold
+            && self.data[skip] == LogicVal::Z
+            && self.data[skip + 1] == LogicVal::Z
+        {
+            skip += 1;
+        }
+
+        // Skip leading '0' characters, but keep at least one character.
+        while skip < threshold && self.data[skip] == LogicVal::Zero {
+            skip += 1;
+        }
+
+        let result_len = len - skip + 1;
+        let mut result = Vec::with_capacity(result_len);
+        result.push(b'b');
+        for i in skip..len {
+            result.push(u8::from(self.data[i]));
+        }
+        result
     }
 
     /// Creates a `LogicVec` from a signed integer value.
@@ -1382,6 +1485,41 @@ mod tests {
         let vec = LogicVec::from_int(original, 24);
         let result = i32::try_from(vec).unwrap();
         assert_eq!(result, original);
+    }
+
+    #[test]
+    fn logic_vec_as_vcd_value_trims_leading_zeros() {
+        let value = LogicVec::from("000101");
+
+        assert_eq!(value.as_vcd_value(), b"b101");
+    }
+
+    #[test]
+    fn logic_vec_as_vcd_value_keeps_single_zero() {
+        let value = LogicVec::from("0000");
+
+        assert_eq!(value.as_vcd_value(), b"b0");
+    }
+
+    #[test]
+    fn logic_vec_as_vcd_value_trims_redundant_leading_x() {
+        let value = LogicVec::from("xxxx1");
+
+        assert_eq!(value.as_vcd_value(), b"bx1");
+    }
+
+    #[test]
+    fn logic_vec_as_vcd_value_trims_redundant_leading_z() {
+        let value = LogicVec::from("zzzz0");
+
+        assert_eq!(value.as_vcd_value(), b"bz0");
+    }
+
+    #[test]
+    fn logic_vec_as_vcd_value_does_not_trim_mixed_unknown_prefixes() {
+        let value = LogicVec::from("xxz1");
+
+        assert_eq!(value.as_vcd_value(), b"bxz1");
     }
 
     #[cfg(feature = "bigint")]

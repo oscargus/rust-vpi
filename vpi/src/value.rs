@@ -2,7 +2,6 @@ use std::ffi::CString;
 use std::fmt::Display;
 
 use num_derive::{FromPrimitive, ToPrimitive};
-use num_traits::FromPrimitive;
 use vpi_sys::PLI_INT32;
 
 #[cfg(feature = "verilator")]
@@ -101,10 +100,10 @@ pub enum ValueType {
     BinStr = vpi_sys::vpiBinStrVal,
     /// Octal string format.
     OctStr = vpi_sys::vpiOctStrVal,
-    /// Hexadecimal string format.
-    HexStr = vpi_sys::vpiHexStrVal,
     /// Decimal string format.
     DecStr = vpi_sys::vpiDecStrVal,
+    /// Hexadecimal string format.
+    HexStr = vpi_sys::vpiHexStrVal,
     /// 4-state scalar format.
     Scalar = vpi_sys::vpiScalarVal,
     /// 32-bit signed integer format.
@@ -145,10 +144,10 @@ pub enum ValueType {
 impl std::fmt::Display for ValueType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let type_name = match self {
-            ValueType::BinStr => "Binary String",
-            ValueType::OctStr => "Octal String",
-            ValueType::HexStr => "Hexadecimal String",
-            ValueType::DecStr => "Decimal String",
+            ValueType::BinStr => "Binary string",
+            ValueType::OctStr => "Octal string",
+            ValueType::HexStr => "Hexadecimal string",
+            ValueType::DecStr => "Decimal string",
             ValueType::Scalar => "Scalar",
             ValueType::Int => "Integer",
             ValueType::Real => "Real",
@@ -156,15 +155,15 @@ impl std::fmt::Display for ValueType {
             ValueType::Vector => "Vector",
             ValueType::Strength => "Strength",
             ValueType::Time => "Time",
-            ValueType::ObjType => "Object Type",
+            ValueType::ObjType => "Object type",
             ValueType::Suppress => "Suppress",
-            ValueType::ShortInt => "Short Integer",
-            ValueType::LongInt => "Long Integer",
-            ValueType::ShortReal => "Short Real",
+            ValueType::ShortInt => "Short integer",
+            ValueType::LongInt => "Long integer",
+            ValueType::ShortReal => "Short real",
             #[cfg(feature = "verilator")]
-            ValueType::RawTwoState => "Raw Two-State Vector",
+            ValueType::RawTwoState => "Raw two-state vector",
             #[cfg(feature = "verilator")]
-            ValueType::RawFourState => "Raw Four-State Vector",
+            ValueType::RawFourState => "Raw four-state vector",
         };
         write!(f, "{type_name}")
     }
@@ -205,9 +204,9 @@ impl StrengthValue {
 
 impl From<vpi_sys::t_vpi_strengthval> for StrengthValue {
     fn from(strength: vpi_sys::t_vpi_strengthval) -> Self {
-        let logic = LogicVal::from_u32(strength.logic as u32).unwrap_or(LogicVal::DontCare);
-        let strength0 = Strength::from_u32(strength.s0 as u32).unwrap_or(Strength::HiZ);
-        let strength1 = Strength::from_u32(strength.s1 as u32).unwrap_or(Strength::HiZ);
+        let logic = LogicVal::try_from(strength.logic as u32).unwrap_or(LogicVal::DontCare);
+        let strength0 = Strength::try_from(strength.s0 as u32).unwrap_or(Strength::HiZ);
+        let strength1 = Strength::try_from(strength.s1 as u32).unwrap_or(Strength::HiZ);
         Self {
             logic,
             strength0,
@@ -216,26 +215,68 @@ impl From<vpi_sys::t_vpi_strengthval> for StrengthValue {
     }
 }
 
-#[repr(u32)]
-#[derive(FromPrimitive, ToPrimitive, Copy, Clone, Debug, PartialEq, Eq)]
+/* TODO: Replace with this version on next major version update
+#[repr(u8)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 /// Drive-strength and charge encodings used by VPI.
 pub enum Strength {
     /// Supply-strength drive.
-    SupplyDrive = vpi_sys::vpiSupplyDrive,
+    SupplyDrive = vpi_sys::vpiSupplyDrive as u8,
     /// Strong drive strength.
-    StrongDrive = vpi_sys::vpiStrongDrive,
+    StrongDrive = vpi_sys::vpiStrongDrive as u8,
     /// Pull drive strength.
-    PullDrive = vpi_sys::vpiPullDrive,
+    PullDrive = vpi_sys::vpiPullDrive as u8,
     /// Large charge strength.
-    LargeCharge = vpi_sys::vpiLargeCharge,
+    LargeCharge = vpi_sys::vpiLargeCharge as u8,
     /// Weak drive strength.
-    WeakDrive = vpi_sys::vpiWeakDrive,
+    WeakDrive = vpi_sys::vpiWeakDrive as u8,
     /// Medium charge strength.
-    MediumCharge = vpi_sys::vpiMediumCharge,
+    MediumCharge = vpi_sys::vpiMediumCharge as u8,
     /// Small charge strength.
-    SmallCharge = vpi_sys::vpiSmallCharge,
+    SmallCharge = vpi_sys::vpiSmallCharge as u8,
     /// High-impedance strength.
-    HiZ = vpi_sys::vpiHiZ,
+    HiZ = vpi_sys::vpiHiZ as u8,
+}
+ */
+
+#[repr(u32)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+/// Drive-strength and charge encodings used by VPI.
+pub enum Strength {
+    /// Supply-strength drive.
+    SupplyDrive = vpi_sys::vpiSupplyDrive as u32,
+    /// Strong drive strength.
+    StrongDrive = vpi_sys::vpiStrongDrive as u32,
+    /// Pull drive strength.
+    PullDrive = vpi_sys::vpiPullDrive as u32,
+    /// Large charge strength.
+    LargeCharge = vpi_sys::vpiLargeCharge as u32,
+    /// Weak drive strength.
+    WeakDrive = vpi_sys::vpiWeakDrive as u32,
+    /// Medium charge strength.
+    MediumCharge = vpi_sys::vpiMediumCharge as u32,
+    /// Small charge strength.
+    SmallCharge = vpi_sys::vpiSmallCharge as u32,
+    /// High-impedance strength.
+    HiZ = vpi_sys::vpiHiZ as u32,
+}
+
+impl TryFrom<u32> for Strength {
+    type Error = ();
+
+    fn try_from(value: u32) -> Result<Self, Self::Error> {
+        match value {
+            vpi_sys::vpiSupplyDrive => Ok(Strength::SupplyDrive),
+            vpi_sys::vpiStrongDrive => Ok(Strength::StrongDrive),
+            vpi_sys::vpiPullDrive => Ok(Strength::PullDrive),
+            vpi_sys::vpiLargeCharge => Ok(Strength::LargeCharge),
+            vpi_sys::vpiWeakDrive => Ok(Strength::WeakDrive),
+            vpi_sys::vpiMediumCharge => Ok(Strength::MediumCharge),
+            vpi_sys::vpiSmallCharge => Ok(Strength::SmallCharge),
+            vpi_sys::vpiHiZ => Ok(Strength::HiZ),
+            _ => Err(()),
+        }
+    }
 }
 
 /// Delay mode used with `vpi_put_value`.
@@ -632,7 +673,7 @@ pub(crate) fn decode_vpi_value(
             Some(Value::DecStr(c_str.to_str().unwrap_or("").to_string()))
         }
         vpi_sys::vpiScalarVal => Some(Value::Scalar(
-            LogicVal::from_u32(unsafe { raw_value.value.integer } as u32)
+            LogicVal::try_from(unsafe { raw_value.value.integer } as u32)
                 .unwrap_or(LogicVal::DontCare),
         )),
         vpi_sys::vpiIntVal => Some(Value::Int(unsafe { raw_value.value.integer })),
@@ -1033,6 +1074,10 @@ pub fn strength_array_to_value_array(values: impl AsRef<[StrengthValue]>) -> Vec
 /// Any `X`, `Z`, `H`, `L`, or `DontCare` bit causes `None` to be returned.
 #[cfg(feature = "bigint")]
 #[must_use]
+#[deprecated(
+    since = "0.5.2",
+    note = "Use `LogicVec::as_biguint` instead of this function."
+)]
 pub fn scalar_vector_to_biguint(bits: impl AsRef<[LogicVal]>) -> Option<num_bigint::BigUint> {
     let mut result = num_bigint::BigUint::ZERO;
     for bit in bits.as_ref() {
@@ -1076,6 +1121,10 @@ pub fn uint64_to_scalar_vector(value: u64, bits: usize) -> Vec<LogicVal> {
 /// Any `X`, `Z`, `H`, `L`, or `DontCare` bit causes `None` to be
 /// returned.
 #[must_use]
+#[deprecated(
+    since = "0.5.2",
+    note = "Use `LogicVec::from(bits).try_into()` instead of this function."
+)]
 pub fn scalar_vector_to_uint64(bits: impl AsRef<[LogicVal]>) -> Option<u64> {
     let bits = bits.as_ref();
     if bits.len() > 64 {
@@ -1186,6 +1235,7 @@ pub fn scalar_vector_to_int64(bits: impl AsRef<[LogicVal]>) -> Option<i64> {
     if bits.is_empty() || bits.len() > 64 {
         return None;
     }
+    #[allow(deprecated)]
     let unsigned = scalar_vector_to_uint64(bits)?;
     // Sign-extend: if the MSB is 1, fill the upper bits.
     let shift = 64 - bits.len();
@@ -1666,7 +1716,7 @@ impl Handle {
                 Some(
                     rawvals
                         .into_iter()
-                        .filter_map(|v| LogicVal::from_u32(v as u32).map(Value::Scalar))
+                        .filter_map(|v| LogicVal::try_from(v as u8).ok().map(Value::Scalar))
                         .collect::<Vec<Value>>(),
                 )
             }
@@ -1726,11 +1776,10 @@ impl Handle {
 #[cfg(test)]
 mod tests {
     use super::{
-        cstring_lossy_no_nul, encode_value_for_put, scalar_vector_to_uint64,
-        strength_array_to_value_array, string_array_to_value_array, time_array_to_value_array,
-        value_array_to_int_array, value_array_to_strength_array, value_array_to_string_array,
-        value_array_to_time_array, LogicVal, LogicVec, PutValueArrayFlags, PutValueDelay,
-        PutValueFlags, Value, ValueType,
+        cstring_lossy_no_nul, encode_value_for_put, strength_array_to_value_array,
+        string_array_to_value_array, time_array_to_value_array, value_array_to_int_array,
+        value_array_to_strength_array, value_array_to_string_array, value_array_to_time_array,
+        LogicVal, LogicVec, PutValueArrayFlags, PutValueDelay, PutValueFlags, Value, ValueType,
     };
     use crate::{Handle, Strength, StrengthValue, Time};
 
@@ -2032,44 +2081,7 @@ mod tests {
 
     #[test]
     fn value_type_display_has_human_readable_labels() {
-        assert_eq!(ValueType::ShortInt.to_string(), "Short Integer");
-    }
-
-    #[test]
-    fn scalar_vector_to_uint64_converts_binary_bits() {
-        let bits = vec![LogicVal::One, LogicVal::Zero, LogicVal::One, LogicVal::One];
-        assert_eq!(scalar_vector_to_uint64(&bits), Some(0b1011));
-    }
-
-    #[test]
-    fn scalar_vector_to_uint64_all_zeros() {
-        let bits = vec![LogicVal::Zero; 8];
-        assert_eq!(scalar_vector_to_uint64(&bits), Some(0));
-    }
-
-    #[test]
-    fn scalar_vector_to_uint64_returns_none_for_x_bit() {
-        let bits = vec![LogicVal::One, LogicVal::X, LogicVal::Zero];
-        assert_eq!(scalar_vector_to_uint64(&bits), None);
-    }
-
-    #[test]
-    fn scalar_vector_to_uint64_returns_none_for_z_bit() {
-        let bits = vec![LogicVal::Zero, LogicVal::Z];
-        assert_eq!(scalar_vector_to_uint64(&bits), None);
-    }
-
-    #[test]
-    fn scalar_vector_to_uint64_returns_none_for_over_64_bits() {
-        let bits = vec![LogicVal::Zero; 65];
-        assert_eq!(scalar_vector_to_uint64(&bits), None);
-    }
-
-    #[test]
-    fn scalar_vector_to_uint64_accepts_exactly_64_bits() {
-        let mut bits = vec![LogicVal::Zero; 63];
-        bits.push(LogicVal::One);
-        assert_eq!(scalar_vector_to_uint64(&bits), Some(1));
+        assert_eq!(ValueType::ShortInt.to_string(), "Short integer");
     }
 
     #[cfg(feature = "verilator")]
@@ -2174,8 +2186,8 @@ mod tests {
 
         #[test]
         fn value_type_display_has_human_readable_labels() {
-            assert_eq!(ValueType::RawFourState.to_string(), "Raw Four-State Vector");
-            assert_eq!(ValueType::ShortInt.to_string(), "Short Integer");
+            assert_eq!(ValueType::RawFourState.to_string(), "Raw four-state vector");
+            assert_eq!(ValueType::ShortInt.to_string(), "Short integer");
         }
     }
 }

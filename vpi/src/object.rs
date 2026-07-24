@@ -4,7 +4,7 @@ use num_derive::{FromPrimitive, ToPrimitive};
 ///
 /// Values map directly to `vpi_sys::vpi*` constants.
 #[repr(u32)]
-#[derive(Copy, Clone, Debug, FromPrimitive, ToPrimitive)]
+#[derive(Copy, Clone, Debug, PartialEq, FromPrimitive, ToPrimitive)]
 pub enum ObjectType {
     /// always procedure
     Always = vpi_sys::vpiAlways,
