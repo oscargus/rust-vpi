@@ -18,6 +18,8 @@ const ARR_IN_0: &str = "put_value_dut.arr_in[0]";
 const ARR_IN_1: &str = "put_value_dut.arr_in[1]";
 const ARR_OUT_0: &str = "put_value_dut.arr_out[0]";
 const ARR_OUT_1: &str = "put_value_dut.arr_out[1]";
+const REAL_IN: &str = "put_value_dut.real_in";
+const REAL_OUT: &str = "put_value_dut.real_out";
 
 #[derive(Copy, Clone)]
 struct TestCase {
@@ -27,6 +29,7 @@ struct TestCase {
     int_in: i32,
     int_arr_in: [i32; 2],
     arr_in: [&'static str; 2],
+    real_in: f64,
     verify_delay: u64,
     inter_test_delay: u64,
 }
@@ -44,6 +47,8 @@ struct DutHandles {
     arr_in_1: Handle,
     arr_out_0: Handle,
     arr_out_1: Handle,
+    real_in: Handle,
+    real_out: Handle,
 }
 
 const TESTS: [TestCase; 5] = [
@@ -54,6 +59,7 @@ const TESTS: [TestCase; 5] = [
         int_in: 41,
         int_arr_in: [41, -12],
         arr_in: ["10", "01"],
+        real_in: 1.5,
         verify_delay: 1,
         inter_test_delay: 2,
     },
@@ -64,6 +70,7 @@ const TESTS: [TestCase; 5] = [
         int_in: 0,
         int_arr_in: [0, 0],
         arr_in: ["00", "00"],
+        real_in: 0.0,
         verify_delay: 2,
         inter_test_delay: 3,
     },
@@ -74,6 +81,7 @@ const TESTS: [TestCase; 5] = [
         int_in: -7,
         int_arr_in: [-7, 1024],
         arr_in: ["11", "10"],
+        real_in: -2.25,
         verify_delay: 1,
         inter_test_delay: 2,
     },
@@ -84,6 +92,7 @@ const TESTS: [TestCase; 5] = [
         int_in: 12345,
         int_arr_in: [12345, -222],
         arr_in: ["01", "11"],
+        real_in: 100.0,
         verify_delay: 3,
         inter_test_delay: 1,
     },
@@ -94,6 +103,7 @@ const TESTS: [TestCase; 5] = [
         int_in: 99,
         int_arr_in: [99, 7],
         arr_in: ["ZH", "XL"],
+        real_in: 0.001,
         verify_delay: 2,
         inter_test_delay: 1,
     },
@@ -130,6 +140,8 @@ fn resolve_dut_handles() -> Option<DutHandles> {
         arr_in_1: Handle::handle_by_name(ARR_IN_1),
         arr_out_0: Handle::handle_by_name(ARR_OUT_0),
         arr_out_1: Handle::handle_by_name(ARR_OUT_1),
+        real_in: Handle::handle_by_name(REAL_IN),
+        real_out: Handle::handle_by_name(REAL_OUT),
     };
 
     if [
@@ -145,6 +157,8 @@ fn resolve_dut_handles() -> Option<DutHandles> {
         handles.arr_in_1.is_null(),
         handles.arr_out_0.is_null(),
         handles.arr_out_1.is_null(),
+        handles.real_in.is_null(),
+        handles.real_out.is_null(),
     ]
     .into_iter()
     .any(|x| x)
@@ -263,6 +277,7 @@ fn run_next_test(_cb_data: &CbData) {
     let _ = handles
         .arr_in_1
         .put_value(&arr_in_1_values.as_vector_value());
+    let _ = handles.real_in.put_value(&Value::Real(test.real_in));
 
     let _ = register_cb_with_time(
         CbReason::AfterDelay,
@@ -412,6 +427,19 @@ fn verify_current_test(_cb_data: &CbData) {
         vpi::printf!("ERROR [{}]: int_arr_in get_value_array failed", test.name);
     }
 
+    match handles.real_in.get_value(ValueType::Real) {
+        Some(Value::Real(v)) if (v - test.real_in).abs() < 1e-9 => {}
+        other => {
+            ok = false;
+            vpi::printf!(
+                "ERROR [{}]: real_in expected {}, got {:?}",
+                test.name,
+                test.real_in,
+                other
+            );
+        }
+    }
+
     let expected_bit_out = invert_binary_scalar(test.bit_in);
     match handles.bit_out.get_value(ValueType::Scalar) {
         Some(Value::Scalar(v)) if v == expected_bit_out => {}
@@ -536,6 +564,20 @@ fn verify_current_test(_cb_data: &CbData) {
     } else {
         ok = false;
         vpi::printf!("ERROR [{}]: int_arr_out get_value_array failed", test.name);
+    }
+
+    let expected_real_out = test.real_in * 2.0;
+    match handles.real_out.get_value(ValueType::Real) {
+        Some(Value::Real(v)) if (v - expected_real_out).abs() < 1e-9 => {}
+        other => {
+            ok = false;
+            vpi::printf!(
+                "ERROR [{}]: real_out expected {}, got {:?}",
+                test.name,
+                expected_real_out,
+                other
+            );
+        }
     }
 
     if ok {

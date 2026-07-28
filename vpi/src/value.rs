@@ -376,7 +376,9 @@ fn encode_value_for_put(value: &Value) -> PutValuePayload {
         }
         Value::Scalar(s) => {
             payload.raw.format = vpi_sys::vpiScalarVal as i32;
-            payload.raw.value = vpi_sys::t_vpi_value__bindgen_ty_1 { scalar: *s as i32 };
+            payload.raw.value = vpi_sys::t_vpi_value__bindgen_ty_1 {
+                scalar: i32::from(*s),
+            };
         }
         Value::Int(v) => {
             payload.raw.format = vpi_sys::vpiIntVal as i32;

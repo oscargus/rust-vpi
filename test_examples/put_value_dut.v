@@ -6,11 +6,13 @@ module put_value_dut;
     integer int_in;
     reg [31:0] int_arr_in [0:1];
     reg [1:0] arr_in [0:1];
+    real real_in;
     wire bit_out;
     wire [7:0] vec_out;
     wire [31:0] int_out;
     wire [31:0] int_arr_out [0:1];
     wire [1:0] arr_out [0:1];
+    real real_out;
 
     initial begin
         bit_in = 1'b0;
@@ -20,6 +22,7 @@ module put_value_dut;
         int_arr_in[1] = 32'h00000000;
         arr_in[0] = 2'b00;
         arr_in[1] = 2'b00;
+        real_in = 0.0;
     end
 
     assign bit_out = ~bit_in;
@@ -29,5 +32,9 @@ module put_value_dut;
     assign int_arr_out[1] = int_arr_in[1] + 1;
     assign arr_out[0] = ~arr_in[0];
     assign arr_out[1] = ~arr_in[1];
+
+    always @(*) begin
+        real_out = real_in * 2.0;
+    end
 
 endmodule
