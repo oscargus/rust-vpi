@@ -75,6 +75,21 @@ impl TryFrom<u8> for LogicVal {
     }
 }
 
+impl From<char> for LogicVal {
+    fn from(c: char) -> Self {
+        match c {
+            '0' => LogicVal::Zero,
+            '1' => LogicVal::One,
+            'X' | 'x' => LogicVal::X,
+            'Z' | 'z' => LogicVal::Z,
+            'H' | 'h' => LogicVal::H,
+            'L' | 'l' => LogicVal::L,
+            '-' => LogicVal::DontCare,
+            _ => LogicVal::X, // Default to unknown for unrecognized characters
+        }
+    }
+}
+
 impl From<LogicVal> for char {
     fn from(value: LogicVal) -> Self {
         match value {
@@ -99,6 +114,34 @@ impl From<LogicVal> for u8 {
             LogicVal::H => b'h',
             LogicVal::L => b'l',
             LogicVal::DontCare => b'-',
+        }
+    }
+}
+
+impl From<LogicVal> for u32 {
+    fn from(logic: LogicVal) -> Self {
+        match logic {
+            LogicVal::Zero => vpi_sys::vpi0,
+            LogicVal::One => vpi_sys::vpi1,
+            LogicVal::X => vpi_sys::vpiX,
+            LogicVal::Z => vpi_sys::vpiZ,
+            LogicVal::H => vpi_sys::vpiH,
+            LogicVal::L => vpi_sys::vpiL,
+            LogicVal::DontCare => vpi_sys::vpiDontCare,
+        }
+    }
+}
+
+impl From<LogicVal> for i32 {
+    fn from(logic: LogicVal) -> Self {
+        match logic {
+            LogicVal::Zero => vpi_sys::vpi0 as i32,
+            LogicVal::One => vpi_sys::vpi1 as i32,
+            LogicVal::X => vpi_sys::vpiX as i32,
+            LogicVal::Z => vpi_sys::vpiZ as i32,
+            LogicVal::H => vpi_sys::vpiH as i32,
+            LogicVal::L => vpi_sys::vpiL as i32,
+            LogicVal::DontCare => vpi_sys::vpiDontCare as i32,
         }
     }
 }
@@ -246,19 +289,7 @@ impl LogicVec {
     /// assert_eq!(vec.len(), 4);
     /// ```
     fn from_str(s: &str) -> Self {
-        let data = s
-            .chars()
-            .map(|c| match c {
-                '0' => LogicVal::Zero,
-                '1' => LogicVal::One,
-                'X' | 'x' => LogicVal::X,
-                'Z' | 'z' => LogicVal::Z,
-                'H' | 'h' => LogicVal::H,
-                'L' | 'l' => LogicVal::L,
-                '-' => LogicVal::DontCare,
-                _ => LogicVal::X, // Default for unrecognized characters
-            })
-            .collect();
+        let data = s.chars().map(LogicVal::from).collect();
         Self { data }
     }
 
@@ -858,6 +889,15 @@ mod tests {
     }
 
     #[test]
+    fn logic_vec_from_slice() {
+        let slice = vec![LogicVal::One, LogicVal::Zero, LogicVal::X];
+        let vec = LogicVec::from(&slice[..]);
+
+        assert_eq!(vec.len(), 3);
+        assert_eq!(vec.to_string(), "10X");
+    }
+
+    #[test]
     fn scalar_vector_to_vecval_round_trips_common_states() {
         let input = vec![LogicVal::X, LogicVal::Z, LogicVal::One, LogicVal::Zero];
 
@@ -865,6 +905,24 @@ mod tests {
         let decoded = vector_value_to_scalar_vector(&encoded, input.len());
 
         assert_eq!(scalar_vec_to_string(decoded), "XZ10");
+    }
+
+    #[test]
+    fn logic_vec_len() {
+        let vec = LogicVec::from(vec![LogicVal::One, LogicVal::Zero, LogicVal::X]);
+        assert_eq!(vec.len(), 3);
+    }
+
+    #[test]
+    fn logic_vec_is_empty() {
+        let vec = LogicVec::from(vec![]);
+        assert!(vec.is_empty());
+    }
+
+    #[test]
+    fn logic_vec_empty_vcd() {
+        let vec = LogicVec::from(vec![]);
+        assert_eq!(vec.as_vcd_value(), vec![b'b']);
     }
 
     #[test]
