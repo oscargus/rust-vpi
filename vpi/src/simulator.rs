@@ -207,6 +207,16 @@ pub fn get_top_module_timescales() -> Vec<(String, Option<Timescale>)> {
     results
 }
 
+/// Returns the simulator's time precision as an integer power of 10.
+pub fn get_simulator_precision() -> i32 {
+    unsafe {
+        vpi_sys::vpi_get(
+            crate::Property::TimePrecision as PLI_INT32,
+            crate::Handle::null().as_raw(),
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{power_of_10_to_time_str, Timescale};
