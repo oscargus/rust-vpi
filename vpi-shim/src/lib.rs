@@ -9,7 +9,7 @@
 #[cfg(target_os = "macos")]
 use std::ffi::c_int;
 #[cfg(any(target_os = "windows", target_os = "macos"))]
-use std::ffi::{c_char, c_void};
+use std::ffi::{c_char, c_void, CStr};
 #[cfg(any(target_os = "windows", target_os = "macos"))]
 use std::sync::OnceLock;
 
@@ -76,6 +76,17 @@ unsafe fn resolve_symbol(name: &[u8]) -> *mut c_void {
 }
 
 #[cfg(any(target_os = "windows", target_os = "macos"))]
+#[unsafe(no_mangle)]
+unsafe extern "C" fn vpi_shim_resolve_symbol(name: *const c_char) -> *mut c_void {
+    let name = unsafe { CStr::from_ptr(name) };
+    let ptr = unsafe { resolve_symbol(name.to_bytes_with_nul()) };
+    if ptr.is_null() {
+        missing_symbol(&name.to_string_lossy());
+    }
+    ptr
+}
+
+#[cfg(any(target_os = "windows", target_os = "macos"))]
 macro_rules! forward_fn {
     ($(fn $name:ident($($arg:ident : $arg_ty:ty),* $(,)?) -> $ret:ty;)+) => {
         $(
@@ -92,6 +103,28 @@ macro_rules! forward_fn {
                     unsafe { std::mem::transmute::<*mut c_void, FnTy>(ptr) }
                 });
                 unsafe { f($($arg),*) }
+            }
+        )+
+    };
+}
+
+#[cfg(any(target_os = "windows", target_os = "macos"))]
+macro_rules! forward_variadic_fn {
+    ($(fn $name:ident($($arg:ident : $arg_ty:ty),+ $(; $vararg:ident : $vararg_ty:ty)? $(,)?) -> $ret:ty;)+) => {
+        $(
+            #[unsafe(no_mangle)]
+            pub unsafe extern "C" fn $name($($arg: $arg_ty),+ $(, $vararg: $vararg_ty)?) -> $ret {
+                type FnTy = unsafe extern "C" fn($($arg_ty),+, ...) -> $ret;
+                static FN: OnceLock<FnTy> = OnceLock::new();
+                let f = *FN.get_or_init(|| {
+                    let symbol = concat!(stringify!($name), "\0").as_bytes();
+                    let ptr = unsafe { resolve_symbol(symbol) };
+                    if ptr.is_null() {
+                        missing_symbol(stringify!($name));
+                    }
+                    unsafe { std::mem::transmute::<*mut c_void, FnTy>(ptr) }
+                });
+                unsafe { f($($arg),+ $(, $vararg)?) }
             }
         )+
     };
@@ -125,7 +158,6 @@ forward_fn! {
     fn vpi_register_systf(systf_data_p: vpi_sys::p_vpi_systf_data) -> vpi_sys::vpiHandle;
     fn vpi_remove_cb(cb_obj: vpi_sys::vpiHandle) -> vpi_sys::PLI_INT32;
     fn vpi_handle(type_: vpi_sys::PLI_INT32, refHandle: vpi_sys::vpiHandle) -> vpi_sys::vpiHandle;
-    fn vpi_handle_multi(type_: vpi_sys::PLI_INT32, refHandle1: vpi_sys::vpiHandle, refHandle2: vpi_sys::vpiHandle) -> vpi_sys::vpiHandle;
     fn vpi_handle_by_name(name: *mut vpi_sys::PLI_BYTE8, scope: vpi_sys::vpiHandle) -> vpi_sys::vpiHandle;
     fn vpi_handle_by_index(object: vpi_sys::vpiHandle, indx: vpi_sys::PLI_INT32) -> vpi_sys::vpiHandle;
     fn vpi_handle_by_multi_index(obj: vpi_sys::vpiHandle, num_index: vpi_sys::PLI_INT32, index_array: *mut vpi_sys::PLI_INT32) -> vpi_sys::vpiHandle;
@@ -135,7 +167,6 @@ forward_fn! {
     fn vpi_get64(property: vpi_sys::PLI_INT32, object: vpi_sys::vpiHandle) -> vpi_sys::PLI_INT64;
     fn vpi_get_str(property: vpi_sys::PLI_INT32, object: vpi_sys::vpiHandle) -> *mut vpi_sys::PLI_BYTE8;
     fn vpi_get_vlog_info(vlog_info_p: vpi_sys::p_vpi_vlog_info) -> vpi_sys::PLI_INT32;
-    fn vpi_control(operation: vpi_sys::PLI_INT32) -> vpi_sys::PLI_INT32;
     fn vpi_compare_objects(object1: vpi_sys::vpiHandle, object2: vpi_sys::vpiHandle) -> vpi_sys::PLI_INT32;
     fn vpi_chk_error(error_info_p: vpi_sys::p_vpi_error_info) -> vpi_sys::PLI_INT32;
     fn vpi_release_handle(object: vpi_sys::vpiHandle) -> vpi_sys::PLI_INT32;
@@ -151,9 +182,12 @@ forward_fn! {
     fn vpi_mcd_name(cd: vpi_sys::PLI_UINT32) -> *mut vpi_sys::PLI_BYTE8;
     fn vpi_mcd_flush(mcd: vpi_sys::PLI_UINT32) -> vpi_sys::PLI_INT32;
 
-    // Forward common fixed-arity call patterns used by this workspace.
-    fn vpi_printf(format: *mut vpi_sys::PLI_BYTE8, arg: *mut vpi_sys::PLI_BYTE8) -> vpi_sys::PLI_INT32;
-    fn vpi_mcd_printf(mcd: vpi_sys::PLI_UINT32, format: *mut vpi_sys::PLI_BYTE8, arg: *mut vpi_sys::PLI_BYTE8) -> vpi_sys::PLI_INT32;
+}
+
+#[cfg(any(target_os = "windows", target_os = "macos"))]
+forward_variadic_fn! {
+    fn vpi_handle_multi(type_: vpi_sys::PLI_INT32, refHandle1: vpi_sys::vpiHandle, refHandle2: vpi_sys::vpiHandle) -> vpi_sys::vpiHandle;
+    fn vpi_control(operation: vpi_sys::PLI_INT32) -> vpi_sys::PLI_INT32;
 }
 
 #[cfg(any(target_os = "windows", target_os = "macos"))]
