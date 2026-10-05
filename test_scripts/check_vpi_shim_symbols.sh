@@ -16,8 +16,10 @@ used_symbols="$({
 } | sort -u)"
 
 forwarded_symbols="$({
-  # Forwarded symbols are declared as `fn vpi_*(` inside forward_fn!/forward_fn_void! invocations.
+  # Rust-forwarded symbols are declared as `fn vpi_*(` inside forwarding macros.
   rg -No --pcre2 -U --no-line-number --no-filename 'fn\s+(vpi_[A-Za-z0-9_]+)\s*\(' vpi-shim/src/lib.rs -r '$1'
+  # The variadic printf entry points are implemented by the C bridge.
+  rg -No --pcre2 --no-line-number --no-filename '^\s*PLI_INT32\s+(vpi_[A-Za-z0-9_]+)\s*\(' vpi-shim/src/printf.c -r '$1'
 } | sort -u)"
 
 missing_symbols="$(comm -23 \

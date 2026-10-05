@@ -17,3 +17,6 @@ sv = ["vpi-sys/sv"]
 
 [dependencies]
 vpi-sys.workspace = true
+
+[build-dependencies]
+cc = "1"
