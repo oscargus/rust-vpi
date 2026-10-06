@@ -18,7 +18,7 @@ vpi is a Rust crate for easily working with the Verilog Procedural Interface (VP
 | `bigint` | Enables conversion between `LogicVec` and arbitrary-precision integers using `num_bigint::BigInt` and `num_bigint::BigUint`. | No |
 | `cb_info` | Uses `vpi_get_cb_info` when removing callbacks. | Yes |
 | `dynamic` | Enables runtime VPI symbol lookup via `vpi-shim` on Windows and macOS, allowing plugins to build without directly linking to a simulator library. | No |
-| `release_handle` | Calls `vpi_release_handle` when dropping a `Handle`. | No |
+| `release_handle` | Calls `vpi_release_handle` instead of `vpi_free_object` when dropping a `Handle`. | No |
 | `sv` | Enables SystemVerilog VPI extensions (types, callbacks, and properties defined in IEEE 1800). | No |
 | `value_array` | Enables support for VPI array values via `vpi_get_value_array` and `vpi_put_value_array`. Otherwise the related functions are still available, but use repeated calls to the scalar `vpi_get_value` and `vpi_put_value` functions. | No |
 | `verilator` | Enables support for Verilator-specific VPI extensions, including two-state and four-state raw vector values. | No |

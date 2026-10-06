@@ -49,7 +49,6 @@ Some lower-level `vpi_user.h` entry points are still only available through
 
 - save/restart state APIs: `vpi_get_data`, `vpi_put_data`
 - per-handle user data APIs: `vpi_get_userdata`, `vpi_put_userdata`
-- explicit object lifetime API: `vpi_free_object`
 
 The varargs print functions `vpi_vprintf` and `vpi_mcd_vprintf`
 will not be supported in `vpi` since it is preferred that the

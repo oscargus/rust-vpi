@@ -105,18 +105,44 @@ fn decode_time(time: vpi_sys::s_vpi_time) -> Option<Time> {
     }
 }
 
+fn time_capacity(delay_count: usize, mtm: bool) -> Option<usize> {
+    delay_count.checked_mul(if mtm { 3 } else { 1 })
+}
+
 impl Handle {
     /// Reads delay values from an object using `vpi_get_delays`.
     ///
     /// `capacity` controls how many delay entries are allocated for the C API.
-    /// Use 1 for simple delays and 3 for min/typ/max delay sets.
     #[must_use]
     pub fn get_delays(&self, capacity: usize, time_type: DelayTimeType) -> Option<DelayData> {
+        self.get_delays_impl(capacity, time_type, false)
+    }
+
+    /// Reads delay values with min/typ/max values enabled.
+    ///
+    /// `delay_count` is the number of delays; the returned data contains up to
+    /// three `Time` values per delay.
+    #[must_use]
+    pub fn get_delays_mtm(
+        &self,
+        delay_count: usize,
+        time_type: DelayTimeType,
+    ) -> Option<DelayData> {
+        self.get_delays_impl(delay_count, time_type, true)
+    }
+
+    fn get_delays_impl(
+        &self,
+        capacity: usize,
+        time_type: DelayTimeType,
+        mtm: bool,
+    ) -> Option<DelayData> {
         if self.is_null() {
             return None;
         }
 
         let no_of_delays = i32::try_from(capacity).ok()?;
+        let time_capacity = time_capacity(capacity, mtm)?;
         let mut raw_times = vec![
             vpi_sys::s_vpi_time {
                 type_: time_type.as_raw(),
@@ -124,7 +150,7 @@ impl Handle {
                 low: 0,
                 real: 0.0,
             };
-            capacity
+            time_capacity
         ];
         let mut raw_delay = vpi_sys::s_vpi_delay {
             da: if raw_times.is_empty() {
@@ -134,7 +160,7 @@ impl Handle {
             },
             no_of_delays,
             time_type: time_type.as_raw(),
-            mtm_flag: 0,
+            mtm_flag: i32::from(mtm),
             append_flag: 0,
             pulsere_flag: 0,
         };
@@ -142,11 +168,13 @@ impl Handle {
         unsafe { vpi_sys::vpi_get_delays(self.as_raw(), &raw mut raw_delay) };
 
         let effective_type = DelayTimeType::from_raw(raw_delay.time_type)?;
+        let times_per_delay = if mtm { 3 } else { 1 };
         let actual_count = if raw_delay.no_of_delays <= 0 {
             0
         } else {
             usize::try_from(raw_delay.no_of_delays).ok()?.min(capacity)
-        };
+        }
+        .checked_mul(times_per_delay)?;
 
         let delays = if actual_count == 0 || raw_delay.da.is_null() {
             Vec::new()
@@ -204,6 +232,7 @@ impl Handle {
 
 #[cfg(test)]
 mod tests {
+    use super::time_capacity;
     use super::{decode_time, DelayData, DelayTimeType};
     use crate::Time;
 
@@ -218,6 +247,13 @@ mod tests {
         assert!(!data.mtm);
         assert!(!data.append);
         assert!(!data.pulsere);
+    }
+
+    #[test]
+    fn delay_time_capacity_accounts_for_mtm_values() {
+        assert_eq!(time_capacity(2, true), Some(6));
+        assert_eq!(time_capacity(2, false), Some(2));
+        assert_eq!(time_capacity(usize::MAX, true), None);
     }
 
     #[test]
