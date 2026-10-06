@@ -1,11 +1,15 @@
 [package]
-name = "intermod_test"
-version = "0.1.0"
-edition = "2021"
-rust-version = "1.88"
+name = "sdf"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+repository.workspace = true
+publish = false
 
 [lib]
 crate-type = ["cdylib"]
+test = false
+doctest = false
 
 [dependencies]
 vpi = { workspace = true, features = ["dynamic"] }
