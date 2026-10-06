@@ -1,6 +1,5 @@
 use num_derive::{FromPrimitive, ToPrimitive};
 use num_traits::FromPrimitive;
-use vpi_sys::PLI_INT32;
 
 use crate::{Handle, ObjectType, Value, ValueType};
 
@@ -987,17 +986,203 @@ impl OpType {
     pub const BitXNor: Self = OpType::BitXnor;
 }
 
+fn nonnegative_u32(value: vpi_sys::PLI_INT32) -> Option<u32> {
+    u32::try_from(value).ok()
+}
+
+fn supports_i32_property(property: &Property) -> bool {
+    matches!(
+        property,
+        Property::Type
+            | Property::Size
+            | Property::LineNo
+            | Property::TimeUnit
+            | Property::TimePrecision
+            | Property::DefNetType
+            | Property::UnconnDrive
+            | Property::DefLineNo
+            | Property::Direction
+            | Property::NetType
+            | Property::ChargeStrength
+            | Property::PortIndex
+            | Property::TermIndex
+            | Property::Strength0
+            | Property::Strength1
+            | Property::PrimType
+            | Property::Polarity
+            | Property::DataPolarity
+            | Property::Edge
+            | Property::PathType
+            | Property::TchkType
+            | Property::OpType
+            | Property::ConstType
+            | Property::FuncType
+            | Property::DefDelayMode
+            | Property::DelayType
+            | Property::IteratorType
+            | Property::Offset
+            | Property::Resolved
+            | Property::IndexedPartSelectType
+    ) || {
+        #[cfg(feature = "sv")]
+        {
+            matches!(
+                property,
+                Property::JoinType
+                    | Property::AccessType
+                    | Property::ArrayType
+                    | Property::RandType
+                    | Property::PortType
+                    | Property::Visibility
+                    | Property::AlwaysType
+                    | Property::DistType
+                    | Property::ClassType
+                    | Property::Qualifier
+                    | Property::InputEdge
+                    | Property::OutputEdge
+                    | Property::CompatibilityMode
+                    | Property::AllocScheme
+                    | Property::StartLine
+                    | Property::Column
+                    | Property::EndLine
+                    | Property::EndColumn
+            )
+        }
+        #[cfg(not(feature = "sv"))]
+        {
+            false
+        }
+    }
+}
+
+fn supports_u32_property(property: &Property) -> bool {
+    matches!(
+        property,
+        Property::Size
+            | Property::LineNo
+            | Property::DefNetType
+            | Property::PortIndex
+            | Property::TermIndex
+    ) || {
+        #[cfg(feature = "sv")]
+        {
+            matches!(property, Property::RandType | Property::DistType)
+        }
+        #[cfg(not(feature = "sv"))]
+        {
+            false
+        }
+    }
+}
+
+fn supports_str_property(property: &Property) -> bool {
+    matches!(
+        property,
+        Property::Name
+            | Property::FullName
+            | Property::DefName
+            | Property::File
+            | Property::DefFile
+            | Property::Type
+            | Property::Decompile
+            | Property::SaveRestartLocation
+    )
+}
+
+fn supports_boolean_property(property: &Property) -> bool {
+    matches!(
+        property,
+        Property::TopModule
+            | Property::CellInstance
+            | Property::Protected
+            | Property::Scalar
+            | Property::Vector
+            | Property::ExplicitName
+            | Property::ConnByName
+            | Property::ExplicitScalared
+            | Property::ExplicitVectored
+            | Property::Expanded
+            | Property::ImplicitDecl
+            | Property::Array
+            | Property::Blocking
+            | Property::NetDeclAssign
+            | Property::UserDefn
+            | Property::Scheduled
+            | Property::Active
+            | Property::Automatic
+            | Property::ConstantSelect
+            | Property::Valid
+            | Property::Signed
+            | Property::LocalParam
+            | Property::ModPathHasIfNone
+            | Property::IsMemory
+            | Property::IsProtected
+            | Property::MultiArray
+    ) || {
+        #[cfg(feature = "sv")]
+        {
+            matches!(
+                property,
+                Property::Top
+                    | Property::ArrayMember
+                    | Property::IsRandomized
+                    | Property::ConstantVariable
+                    | Property::StructUnionMember
+                    | Property::Packed
+                    | Property::Tagged
+                    | Property::Virtual
+                    | Property::HasActual
+                    | Property::IsConstraintEnabled
+                    | Property::Soft
+                    | Property::Method
+                    | Property::IsClockInferred
+                    | Property::Generic
+                    | Property::PackedArrayMember
+                    | Property::OpStrong
+                    | Property::IsDeferred
+                    | Property::IsCoverSequence
+                    | Property::DPIPure
+                    | Property::DPIContext
+                    | Property::DPICStr
+                    | Property::DPICIdentifier
+                    | Property::IsModPort
+                    | Property::IsFinal
+            )
+        }
+        #[cfg(not(feature = "sv"))]
+        {
+            false
+        }
+    }
+}
+
 impl Handle {
+    /// Reads a property known to return a 32-bit integer using `vpi_get`.
+    ///
+    /// Properties outside the crate's supported integer-property set, such as
+    /// string or boolean properties, return `None`. This conservative list may
+    /// omit valid properties; use [`Handle::get_raw_property`] for unfiltered
+    /// `vpi_get` access or [`Handle::get_i64`] for unfiltered `vpi_get64` access.
+    #[must_use]
+    pub fn get_i32(&self, property: Property) -> Option<i32> {
+        if self.is_null() || !supports_i32_property(&property) {
+            return None;
+        }
+
+        Some(unsafe { vpi_sys::vpi_get(property as vpi_sys::PLI_INT32, self.as_raw()) })
+    }
+
     /// Reads a numeric property using `vpi_get64` and returns it as `i64`.
     ///
-    /// Returns `None` for null handles.
+    /// This accessor does not apply a property whitelist. Returns `None` for
+    /// null handles.
     #[must_use]
     pub fn get_i64(&self, property: Property) -> Option<i64> {
         if self.is_null() {
             return None;
         }
 
-        let value = unsafe { vpi_sys::vpi_get64(property as PLI_INT32, self.as_raw()) };
+        let value = unsafe { vpi_sys::vpi_get64(property as vpi_sys::PLI_INT32, self.as_raw()) };
         Some(value)
     }
 
@@ -1012,102 +1197,66 @@ impl Handle {
 
     /// Reads a numeric property and returns it as `u32` when supported.
     ///
-    /// Returns `None` for null handles or unsupported properties.
+    /// Returns `None` for null handles, unsupported properties, or negative
+    /// values. The supported-property list may be incomplete; use
+    /// [`Handle::get_raw_property`] or [`Handle::get_i64`] for unfiltered
+    /// numeric access.
     #[must_use]
     pub fn get_u32(&self, property: Property) -> Option<u32> {
-        if self.is_null() {
+        if self.is_null() || !supports_u32_property(&property) {
             return None;
         }
-        match property {
-            Property::Size
-            | Property::LineNo
-            | Property::TimeUnit
-            | Property::TimePrecision
-            | Property::DefNetType
-            | Property::PortIndex
-            | Property::TermIndex => unsafe {
-                let value = vpi_sys::vpi_get(property as PLI_INT32, self.as_raw());
-                Some(value as u32)
-            },
-            #[cfg(feature = "sv")]
-            Property::RandType | Property::DistType => unsafe {
-                let value = vpi_sys::vpi_get(property as PLI_INT32, self.as_raw());
-                Some(value as u32)
-            },
-            _ => None, // For simplicity, only handle common properties here
-        }
+        let value = unsafe { vpi_sys::vpi_get(property as vpi_sys::PLI_INT32, self.as_raw()) };
+        nonnegative_u32(value)
     }
 
     /// Reads a string property when supported.
     ///
     /// Returns `None` for null handles, unsupported properties, or invalid UTF-8.
+    /// The supported-property list may be incomplete; for other string
+    /// properties, use [`Handle::get_raw_str_property`].
     #[must_use]
     pub fn get_str(&self, property: Property) -> Option<String> {
+        if self.is_null() || !supports_str_property(&property) {
+            return None;
+        }
+
+        self.get_raw_str_property(property)
+    }
+
+    /// Reads a string property using `vpi_get_str` without applying a property
+    /// whitelist.
+    ///
+    /// Returns `None` for null handles, null results, or invalid UTF-8.
+    #[must_use]
+    pub fn get_raw_str_property(&self, property: Property) -> Option<String> {
         if self.is_null() {
             return None;
         }
-        match property {
-            Property::Name
-            | Property::FullName
-            | Property::DefName
-            | Property::File
-            | Property::DefFile
-            | Property::Type => unsafe {
-                let ptr = vpi_sys::vpi_get_str(property as PLI_INT32, self.as_raw());
-                if ptr.is_null() {
-                    None
-                } else {
-                    let c_str = std::ffi::CStr::from_ptr(ptr);
-                    if let Ok(str_slice) = c_str.to_str() {
-                        Some(str_slice.to_string())
-                    } else {
-                        None
-                    }
-                }
-            },
-            _ => None, // For simplicity, only handle common properties here
+
+        let ptr = unsafe { vpi_sys::vpi_get_str(property as vpi_sys::PLI_INT32, self.as_raw()) };
+        if ptr.is_null() {
+            None
+        } else {
+            unsafe { std::ffi::CStr::from_ptr(ptr) }
+                .to_str()
+                .ok()
+                .map(str::to_owned)
         }
     }
 
     /// Reads a boolean property when supported.
     ///
-    /// Returns `None` for null handles or unsupported properties.
+    /// Returns `None` for null handles or unsupported properties. The
+    /// supported-property list may be incomplete; use
+    /// [`Handle::get_raw_property`] when the property's type is uncertain.
     #[must_use]
     pub fn get_bool(&self, property: Property) -> Option<bool> {
-        if self.is_null() {
+        if self.is_null() || !supports_boolean_property(&property) {
             return None;
         }
-        match property {
-            Property::TopModule
-            | Property::CellInstance
-            | Property::Protected
-            | Property::Scalar
-            | Property::Vector
-            | Property::ExplicitName
-            | Property::ConnByName
-            | Property::ExplicitScalared
-            | Property::ExplicitVectored
-            | Property::Expanded
-            | Property::ImplicitDecl
-            | Property::Array
-            | Property::Blocking
-            | Property::UserDefn
-            | Property::Scheduled
-            | Property::Signed
-            | Property::LocalParam
-            | Property::ModPathHasIfNone
-            | Property::IsMemory
-            | Property::IsProtected => unsafe {
-                let value = vpi_sys::vpi_get(property as PLI_INT32, self.as_raw());
-                Some(value != 0)
-            },
-            #[cfg(feature = "sv")]
-            Property::IsRandomized | Property::IsConstraintEnabled | Property::Soft => unsafe {
-                let value = vpi_sys::vpi_get(property as PLI_INT32, self.as_raw());
-                Some(value != 0)
-            },
-            _ => None, // For simplicity, only handle common properties here
-        }
+        let value = unsafe { vpi_sys::vpi_get(property as vpi_sys::PLI_INT32, self.as_raw()) };
+        Some(value != 0)
     }
 
     /// Returns this object's port direction, if available.
@@ -1116,7 +1265,8 @@ impl Handle {
         if self.is_null() {
             return None;
         }
-        let value = unsafe { vpi_sys::vpi_get(Property::Direction as PLI_INT32, self.as_raw()) };
+        let value =
+            unsafe { vpi_sys::vpi_get(Property::Direction as vpi_sys::PLI_INT32, self.as_raw()) };
         Direction::from_u32(value as u32)
     }
 
@@ -1126,7 +1276,8 @@ impl Handle {
         if self.is_null() {
             return None;
         }
-        let value = unsafe { vpi_sys::vpi_get(Property::OpType as PLI_INT32, self.as_raw()) };
+        let value =
+            unsafe { vpi_sys::vpi_get(Property::OpType as vpi_sys::PLI_INT32, self.as_raw()) };
         OpType::from_u32(value as u32)
     }
 
@@ -1136,7 +1287,8 @@ impl Handle {
         if self.is_null() {
             return None;
         }
-        let value = unsafe { vpi_sys::vpi_get(Property::PrimType as PLI_INT32, self.as_raw()) };
+        let value =
+            unsafe { vpi_sys::vpi_get(Property::PrimType as vpi_sys::PLI_INT32, self.as_raw()) };
         PrimType::from_u32(value as u32)
     }
 
@@ -1146,7 +1298,8 @@ impl Handle {
         if self.is_null() {
             return None;
         }
-        let value = unsafe { vpi_sys::vpi_get(Property::TchkType as PLI_INT32, self.as_raw()) };
+        let value =
+            unsafe { vpi_sys::vpi_get(Property::TchkType as vpi_sys::PLI_INT32, self.as_raw()) };
         TchkType::from_u32(value as u32)
     }
 
@@ -1156,7 +1309,8 @@ impl Handle {
         if self.is_null() {
             return None;
         }
-        let value = unsafe { vpi_sys::vpi_get(Property::ConstType as PLI_INT32, self.as_raw()) };
+        let value =
+            unsafe { vpi_sys::vpi_get(Property::ConstType as vpi_sys::PLI_INT32, self.as_raw()) };
         ConstType::from_u32(value as u32)
     }
 
@@ -1184,7 +1338,8 @@ impl Handle {
         if self.is_null() {
             return None;
         }
-        let value = unsafe { vpi_sys::vpi_get(Property::FuncType as PLI_INT32, self.as_raw()) };
+        let value =
+            unsafe { vpi_sys::vpi_get(Property::FuncType as vpi_sys::PLI_INT32, self.as_raw()) };
         FuncType::from_u32(value as u32)
     }
 
@@ -1194,7 +1349,8 @@ impl Handle {
         if self.is_null() {
             return None;
         }
-        let value = unsafe { vpi_sys::vpi_get(Property::SysFuncType as PLI_INT32, self.as_raw()) };
+        let value =
+            unsafe { vpi_sys::vpi_get(Property::SysFuncType as vpi_sys::PLI_INT32, self.as_raw()) };
         SysFuncType::from_u32(value as u32)
     }
 
@@ -1204,7 +1360,8 @@ impl Handle {
         if self.is_null() {
             return None;
         }
-        let value = unsafe { vpi_sys::vpi_get(Property::Edge as PLI_INT32, self.as_raw()) };
+        let value =
+            unsafe { vpi_sys::vpi_get(Property::Edge as vpi_sys::PLI_INT32, self.as_raw()) };
         Edge::from_bits(value as u32)
     }
 
@@ -1214,7 +1371,8 @@ impl Handle {
         if self.is_null() {
             return None;
         }
-        let value = unsafe { vpi_sys::vpi_get(Property::Type as PLI_INT32, self.as_raw()) };
+        let value =
+            unsafe { vpi_sys::vpi_get(Property::Type as vpi_sys::PLI_INT32, self.as_raw()) };
         ObjectType::from_u32(value as u32)
     }
 
@@ -1225,7 +1383,8 @@ impl Handle {
             return None;
         }
 
-        let raw_value = unsafe { vpi_sys::vpi_get(ObjectType::Index as PLI_INT32, self.as_raw()) };
+        let raw_value =
+            unsafe { vpi_sys::vpi_get(ObjectType::Index as vpi_sys::PLI_INT32, self.as_raw()) };
         Some(raw_value)
     }
 
@@ -1301,7 +1460,8 @@ impl Handle {
         if self.is_null() {
             return None;
         }
-        let raw = unsafe { vpi_sys::vpi_get(Property::RandType as PLI_INT32, self.as_raw()) };
+        let raw =
+            unsafe { vpi_sys::vpi_get(Property::RandType as vpi_sys::PLI_INT32, self.as_raw()) };
         RandType::from_u32(raw as u32)
     }
 
@@ -1326,7 +1486,8 @@ impl Handle {
         if self.is_null() {
             return None;
         }
-        let raw = unsafe { vpi_sys::vpi_get(Property::DistType as PLI_INT32, self.as_raw()) };
+        let raw =
+            unsafe { vpi_sys::vpi_get(Property::DistType as vpi_sys::PLI_INT32, self.as_raw()) };
         DistType::from_u32(raw as u32)
     }
 
@@ -1405,7 +1566,7 @@ impl Handle {
         if ts.is_null() {
             return None;
         }
-        let raw = unsafe { vpi_sys::vpi_get(Property::Type as PLI_INT32, ts.as_raw()) };
+        let raw = unsafe { vpi_sys::vpi_get(Property::Type as vpi_sys::PLI_INT32, ts.as_raw()) };
         Typespec::from_u32(raw as u32)
     }
 
@@ -1471,7 +1632,8 @@ impl Handle {
             }
 
             // 3. Read the net subtype directly from the port object.
-            let raw = unsafe { vpi_sys::vpi_get(Property::NetType as PLI_INT32, self.as_raw()) };
+            let raw =
+                unsafe { vpi_sys::vpi_get(Property::NetType as vpi_sys::PLI_INT32, self.as_raw()) };
             if let Some(net_type) = NetType::from_u32(raw as u32) {
                 return Some(net_type.to_string());
             }
@@ -1508,7 +1670,7 @@ impl Handle {
         if self.is_null() {
             return None;
         }
-        let raw = unsafe { vpi_sys::vpi_get(Property::Type as PLI_INT32, self.as_raw()) };
+        let raw = unsafe { vpi_sys::vpi_get(Property::Type as vpi_sys::PLI_INT32, self.as_raw()) };
         VarType::from_u32(raw as u32)
     }
 
@@ -1518,19 +1680,21 @@ impl Handle {
         self.get_u32(Property::Size)
     }
 
-    /// Reads a numeric property using `vpi_get` and returns it as `PLI_INT32`.
+    /// Reads any numeric property using `vpi_get` and returns it as `PLI_INT32`.
     ///
-    /// Returns `None` for null handles.
+    /// This accessor does not apply a property whitelist. Returns `None` for
+    /// null handles.
     ///
-    /// To obtain specific types like `u32`, `u64`, or `i64`, use the corresponding methods: `get_u32`, `get_u64`, or `get_i64`.
+    /// To obtain specific types like `u32`, `i32`, `u64`, or `i64`, use the corresponding methods: `get_u32`, `get_i32`, `get_u64`, or `get_i64`.
+    /// Those methods also have a whitelist of supported properties.
     ///
     /// To obtain other types use the corresponding methods.
     #[must_use]
-    pub fn get_raw_property(&self, property: Property) -> Option<PLI_INT32> {
+    pub fn get_raw_property(&self, property: Property) -> Option<vpi_sys::PLI_INT32> {
         if self.is_null() {
             return None;
         }
-        let value = unsafe { vpi_sys::vpi_get(property as PLI_INT32, self.as_raw()) };
+        let value = unsafe { vpi_sys::vpi_get(property as vpi_sys::PLI_INT32, self.as_raw()) };
         Some(value)
     }
 
@@ -1544,9 +1708,76 @@ impl Handle {
     }
 }
 
+#[cfg(test)]
+mod numeric_property_tests {
+    use super::{
+        nonnegative_u32, supports_boolean_property, supports_i32_property, supports_str_property,
+        supports_u32_property, Property,
+    };
+    use crate::Handle;
+
+    #[test]
+    fn unsigned_property_conversion_rejects_negative_values() {
+        assert_eq!(nonnegative_u32(-9), None);
+        assert_eq!(nonnegative_u32(0), Some(0));
+        assert_eq!(nonnegative_u32(12), Some(12));
+    }
+
+    #[test]
+    fn i32_property_filter_accepts_integer_properties_only() {
+        assert!(supports_i32_property(&Property::Size));
+        assert!(supports_i32_property(&Property::TimePrecision));
+        assert!(supports_i32_property(&Property::Direction));
+        assert!(!supports_i32_property(&Property::TopModule));
+        assert!(!supports_i32_property(&Property::Name));
+        assert!(!supports_i32_property(&Property::FullName));
+        assert!(!supports_i32_property(&Property::Undefined));
+    }
+
+    #[test]
+    fn boolean_property_filter_accepts_boolean_properties_only() {
+        assert!(supports_boolean_property(&Property::TopModule));
+        assert!(supports_boolean_property(&Property::NetDeclAssign));
+        assert!(!supports_boolean_property(&Property::TimeUnit));
+        assert!(!supports_boolean_property(&Property::Direction));
+    }
+
+    #[test]
+    fn u32_property_filter_accepts_only_supported_unsigned_properties() {
+        assert!(supports_u32_property(&Property::Size));
+        assert!(supports_u32_property(&Property::LineNo));
+        assert!(!supports_u32_property(&Property::TimeUnit));
+        assert!(!supports_u32_property(&Property::Name));
+    }
+
+    #[test]
+    fn string_property_filter_accepts_known_string_properties() {
+        assert!(supports_str_property(&Property::Name));
+        assert!(supports_str_property(&Property::Type));
+        assert!(supports_str_property(&Property::Decompile));
+        assert!(supports_str_property(&Property::SaveRestartLocation));
+        assert!(!supports_str_property(&Property::Size));
+        assert!(!supports_str_property(&Property::TimeUnit));
+    }
+
+    #[test]
+    fn get_i32_returns_none_for_null_handles_and_unsupported_properties() {
+        let handle = Handle::null();
+        assert_eq!(handle.get_i32(Property::Size), None);
+        assert_eq!(handle.get_u32(Property::Size), None);
+        assert_eq!(handle.get_i32(Property::Name), None);
+        assert_eq!(handle.get_str(Property::Name), None);
+        assert_eq!(handle.get_raw_str_property(Property::Name), None);
+        assert_eq!(handle.get_bool(Property::TopModule), None);
+    }
+}
+
 #[cfg(all(test, feature = "sv"))]
 mod tests {
-    use super::{DistType, RandType};
+    use super::{
+        supports_boolean_property, supports_i32_property, supports_str_property,
+        supports_u32_property, DistType, Property, RandType,
+    };
     use crate::Handle;
 
     #[test]
@@ -1576,5 +1807,16 @@ mod tests {
         assert_eq!(RandType::RandC as u32, vpi_sys::vpiRandC);
         assert_eq!(DistType::Equal as u32, vpi_sys::vpiEqualDist);
         assert_eq!(DistType::Div as u32, vpi_sys::vpiDivDist);
+    }
+
+    #[test]
+    fn sv_properties_are_filtered_by_value_type() {
+        assert!(supports_u32_property(&Property::RandType));
+        assert!(supports_u32_property(&Property::DistType));
+        assert!(supports_i32_property(&Property::RandType));
+        assert!(supports_boolean_property(&Property::IsRandomized));
+        assert!(supports_boolean_property(&Property::Soft));
+        assert!(!supports_i32_property(&Property::IsRandomized));
+        assert!(!supports_str_property(&Property::Unit));
     }
 }

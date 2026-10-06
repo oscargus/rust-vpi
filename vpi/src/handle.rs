@@ -1,5 +1,4 @@
 use crate::ObjectType;
-use vpi_sys::{vpiHandle, PLI_INT32};
 
 /// Wrapper around a raw VPI object handle.
 ///
@@ -8,7 +7,7 @@ use vpi_sys::{vpiHandle, PLI_INT32};
 #[derive(Debug)]
 pub struct Handle {
     /// Underlying simulator-owned VPI handle pointer.
-    handle: vpiHandle,
+    handle: vpi_sys::vpiHandle,
 }
 
 impl Default for Handle {
@@ -57,7 +56,7 @@ impl Handle {
 
     /// Returns the underlying raw VPI handle.
     #[must_use]
-    pub fn as_raw(&self) -> vpiHandle {
+    pub fn as_raw(&self) -> vpi_sys::vpiHandle {
         self.handle
     }
 
@@ -68,8 +67,7 @@ impl Handle {
         self.handle = std::ptr::null_mut();
     }
 
-    /// Constructs a [`Handle`] from a raw VPI handle pointer.
-    pub fn from_raw(raw: vpiHandle) -> Self {
+    pub(crate) fn from_vpi(raw: vpi_sys::vpiHandle) -> Self {
         Self { handle: raw }
     }
 
@@ -100,15 +98,15 @@ impl Handle {
         };
         let handle =
             unsafe { vpi_sys::vpi_handle_by_name(c_name.as_ptr().cast_mut().cast(), scope_raw) };
-        Self::from_raw(handle)
+        Self::from_vpi(handle)
     }
 
     /// Returns an iterator handle for objects of `typ` under this handle.
     #[must_use]
     pub fn iterator(&self, typ: ObjectType) -> HandleIterator {
-        let raw = unsafe { vpi_sys::vpi_iterate(typ as PLI_INT32, self.as_raw()) };
+        let raw = unsafe { vpi_sys::vpi_iterate(typ as vpi_sys::PLI_INT32, self.as_raw()) };
         HandleIterator {
-            iter: Handle::from_raw(raw),
+            iter: Handle::from_vpi(raw),
         }
     }
 
@@ -117,8 +115,8 @@ impl Handle {
     /// Returns a null handle when the relation is unavailable.
     #[must_use]
     pub fn get(&self, typ: ObjectType) -> Self {
-        let handle = unsafe { vpi_sys::vpi_handle(typ as PLI_INT32, self.as_raw()) };
-        Self::from_raw(handle)
+        let handle = unsafe { vpi_sys::vpi_handle(typ as vpi_sys::PLI_INT32, self.as_raw()) };
+        Self::from_vpi(handle)
     }
 
     /// Returns a child handle by index.
@@ -127,7 +125,7 @@ impl Handle {
     #[must_use]
     pub fn handle_by_index(&self, index: i32) -> Self {
         let handle = unsafe { vpi_sys::vpi_handle_by_index(self.as_raw(), index) };
-        Self::from_raw(handle)
+        Self::from_vpi(handle)
     }
 
     /// Iterates across multiple object kinds and flattens all resulting handles.
@@ -146,9 +144,10 @@ impl Handle {
             return Self::null();
         }
 
-        let handle =
-            unsafe { vpi_sys::vpi_handle_multi(typ as PLI_INT32, self.as_raw(), other.as_raw()) };
-        Self::from_raw(handle)
+        let handle = unsafe {
+            vpi_sys::vpi_handle_multi(typ as vpi_sys::PLI_INT32, self.as_raw(), other.as_raw())
+        };
+        Self::from_vpi(handle)
     }
 
     /// Returns the intermodule path between this handle and `other`.
@@ -180,11 +179,11 @@ impl Handle {
         let handle = unsafe {
             vpi_sys::vpi_handle_by_multi_index(
                 self.as_raw(),
-                num_index as PLI_INT32,
+                num_index as vpi_sys::PLI_INT32,
                 indices.as_ptr().cast_mut(),
             )
         };
-        Self::from_raw(handle)
+        Self::from_vpi(handle)
     }
 
     /// Convenience helper for multi-handle traversal.
@@ -211,7 +210,7 @@ impl Iterator for HandleIterator {
             return None;
         }
 
-        let next = Handle::from_raw(unsafe { vpi_sys::vpi_scan(self.iter.as_raw()) });
+        let next = Handle::from_vpi(unsafe { vpi_sys::vpi_scan(self.iter.as_raw()) });
 
         if next.is_null() {
             // The handle is automatically released when the iterator is exhausted

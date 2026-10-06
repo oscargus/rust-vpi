@@ -265,8 +265,12 @@ fn run_next_test(_cb_data: &CbData) {
     let _ = handles.vec_in.put_value(&vec_in_values.as_vector_value());
     let _ = handles.int_in.put_value(&Value::Int(test.int_in));
     let int_arr_in_values = vpi::int_array_to_value_array(test.int_arr_in);
-    if !handles.int_arr_in.put_value_array(&int_arr_in_values) {
-        vpi::printf!("ERROR [{}]: int_arr_in put_value_array failed", test.name);
+    if let Err(error) = handles.int_arr_in.put_value_array(&int_arr_in_values) {
+        vpi::printf!(
+            "ERROR [{}]: int_arr_in put_value_array failed: {}",
+            test.name,
+            error
+        );
         HAD_FAILURE.store(true, Ordering::SeqCst);
         control(Control::Finish);
         return;

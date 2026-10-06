@@ -1,5 +1,50 @@
 use crate::Time;
-use vpi_sys::PLI_INT32;
+
+/// Failure reported while retrieving simulator invocation metadata.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SimulatorInfoError {
+    /// `vpi_get_vlog_info` reported that the information is unavailable.
+    Unavailable,
+    /// The simulator did not provide a product name.
+    MissingProduct,
+    /// The simulator did not provide a version string.
+    MissingVersion,
+    /// The simulator returned a negative argument count.
+    InvalidArgumentCount,
+    /// The simulator reported arguments but returned a null argument array.
+    MissingArguments,
+    /// An argument entry in the simulator-provided array was null.
+    MissingArgument(usize),
+}
+
+impl std::fmt::Display for SimulatorInfoError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Unavailable => write!(f, "simulator invocation information is unavailable"),
+            Self::MissingProduct => write!(f, "simulator product name is missing"),
+            Self::MissingVersion => write!(f, "simulator version is missing"),
+            Self::InvalidArgumentCount => write!(f, "simulator returned a negative argument count"),
+            Self::MissingArguments => write!(f, "simulator argument array is missing"),
+            Self::MissingArgument(index) => {
+                write!(f, "simulator argument {index} is missing")
+            }
+        }
+    }
+}
+
+impl std::error::Error for SimulatorInfoError {}
+
+fn copy_c_string(ptr: *const std::ffi::c_char) -> Option<String> {
+    if ptr.is_null() {
+        None
+    } else {
+        Some(
+            unsafe { std::ffi::CStr::from_ptr(ptr) }
+                .to_string_lossy()
+                .into_owned(),
+        )
+    }
+}
 
 /// Returns simulator invocation metadata from `vpi_get_vlog_info`.
 ///
@@ -7,35 +52,41 @@ use vpi_sys::PLI_INT32;
 /// arguments as reported by the active VPI implementation.
 #[must_use]
 pub fn simulator_info() -> SimulatorInfo {
+    try_simulator_info().expect("could not retrieve simulator invocation information")
+}
+
+/// Fallible version of [`simulator_info`].
+///
+/// Checks the return status and required pointers supplied by
+/// `vpi_get_vlog_info`.
+pub fn try_simulator_info() -> Result<SimulatorInfo, SimulatorInfoError> {
     let mut vlog_info = vpi_sys::t_vpi_vlog_info {
         argc: 0,
         argv: std::ptr::null_mut(),
         version: std::ptr::null_mut(),
         product: std::ptr::null_mut(),
     };
-    unsafe { vpi_sys::vpi_get_vlog_info(&raw mut vlog_info) };
-    let version = unsafe { std::ffi::CStr::from_ptr(vlog_info.version) }
-        .to_str()
-        .unwrap_or("Unknown")
-        .to_string();
-    let product = unsafe { std::ffi::CStr::from_ptr(vlog_info.product) }
-        .to_str()
-        .unwrap_or("Unknown")
-        .to_string();
-    let mut arguments = Vec::new();
-    for i in 0..vlog_info.argc {
-        let arg_ptr = unsafe { *vlog_info.argv.add(i as usize) };
-        let arg = unsafe { std::ffi::CStr::from_ptr(arg_ptr) }
-            .to_str()
-            .unwrap_or("Unknown")
-            .to_string();
-        arguments.push(arg);
+    if unsafe { vpi_sys::vpi_get_vlog_info(&raw mut vlog_info) } == 0 {
+        return Err(SimulatorInfoError::Unavailable);
     }
-    SimulatorInfo {
+    let version = copy_c_string(vlog_info.version).ok_or(SimulatorInfoError::MissingVersion)?;
+    let product = copy_c_string(vlog_info.product).ok_or(SimulatorInfoError::MissingProduct)?;
+    if vlog_info.argc < 0 {
+        return Err(SimulatorInfoError::InvalidArgumentCount);
+    }
+    if vlog_info.argc > 0 && vlog_info.argv.is_null() {
+        return Err(SimulatorInfoError::MissingArguments);
+    }
+    let mut arguments = Vec::new();
+    for i in 0..vlog_info.argc as usize {
+        let arg_ptr = unsafe { *vlog_info.argv.add(i) };
+        arguments.push(copy_c_string(arg_ptr).ok_or(SimulatorInfoError::MissingArgument(i))?);
+    }
+    Ok(SimulatorInfo {
         arguments,
         version,
         product,
-    }
+    })
 }
 
 /// Simulator metadata reported by `vpi_get_vlog_info`.
@@ -52,33 +103,23 @@ pub struct SimulatorInfo {
 /// Returns the simulator product name.
 #[must_use]
 pub fn simulator_name() -> String {
-    let mut vlog_info = vpi_sys::t_vpi_vlog_info {
-        argc: 0,
-        argv: std::ptr::null_mut(),
-        version: std::ptr::null_mut(),
-        product: std::ptr::null_mut(),
-    };
-    unsafe { vpi_sys::vpi_get_vlog_info(&raw mut vlog_info) };
-    unsafe { std::ffi::CStr::from_ptr(vlog_info.product) }
-        .to_str()
-        .unwrap_or("Unknown")
-        .to_string()
+    try_simulator_name().expect("could not retrieve simulator invocation information")
+}
+
+/// Fallible version of [`simulator_name`].
+pub fn try_simulator_name() -> Result<String, SimulatorInfoError> {
+    Ok(try_simulator_info()?.product)
 }
 
 /// Returns the simulator version string.
 #[must_use]
 pub fn simulator_version() -> String {
-    let mut vlog_info = vpi_sys::t_vpi_vlog_info {
-        argc: 0,
-        argv: std::ptr::null_mut(),
-        version: std::ptr::null_mut(),
-        product: std::ptr::null_mut(),
-    };
-    unsafe { vpi_sys::vpi_get_vlog_info(&raw mut vlog_info) };
-    unsafe { std::ffi::CStr::from_ptr(vlog_info.version) }
-        .to_str()
-        .unwrap_or("Unknown")
-        .to_string()
+    try_simulator_version().expect("could not retrieve simulator invocation information")
+}
+
+/// Fallible version of [`simulator_version`].
+pub fn try_simulator_version() -> Result<String, SimulatorInfoError> {
+    Ok(try_simulator_info()?.version)
 }
 
 /// Returns the current simulation time.
@@ -111,13 +152,21 @@ impl Timescale {
     ///
     /// # Safety
     /// The handle must be a valid VPI module handle
-    unsafe fn from_module(module_handle: vpi_sys::vpiHandle) -> Option<Self> {
+    unsafe fn from_module(module_handle: vpi_sys::vpiHandle) -> Self {
         // SAFETY: Caller guarantees module_handle is valid
-        let unit =
-            unsafe { vpi_sys::vpi_get(crate::Property::TimeUnit as PLI_INT32, module_handle) };
-        let precision =
-            unsafe { vpi_sys::vpi_get(crate::Property::TimePrecision as PLI_INT32, module_handle) };
-        Some(Timescale { unit, precision })
+        let unit = unsafe {
+            vpi_sys::vpi_get(
+                crate::Property::TimeUnit as vpi_sys::PLI_INT32,
+                module_handle,
+            )
+        };
+        let precision = unsafe {
+            vpi_sys::vpi_get(
+                crate::Property::TimePrecision as vpi_sys::PLI_INT32,
+                module_handle,
+            )
+        };
+        Timescale { unit, precision }
     }
 
     /// Convert time unit/precision to a human-readable string
@@ -167,41 +216,27 @@ fn power_of_10_to_time_str(power: i32) -> String {
 
 /// Returns timescale information for top-level modules.
 ///
-/// Each entry contains `(module_name, timescale)` where `timescale` is `None`
-/// when time unit/precision properties are not available.
+/// Each entry contains a module name and its effective time unit/precision.
 #[must_use]
-pub fn get_top_module_timescales() -> Vec<(String, Option<Timescale>)> {
+pub fn get_top_module_timescales() -> Vec<(String, Timescale)> {
     let mut results = Vec::new();
 
-    unsafe {
-        // Iterate over all top-level modules
-        let iter = vpi_sys::vpi_iterate(vpi_sys::vpiModule as i32, std::ptr::null_mut());
-        if iter.is_null() {
-            return results;
-        }
+    let iter = crate::Handle::null().iterator(crate::ObjectType::Module);
+    for module in iter {
+        let name_ptr =
+            unsafe { vpi_sys::vpi_get_str(crate::Property::Name as i32, module.as_raw()) };
+        let name = if name_ptr.is_null() {
+            "Unknown".to_string()
+        } else {
+            unsafe { std::ffi::CStr::from_ptr(name_ptr) }
+                .to_str()
+                .unwrap_or("Unknown")
+                .to_string()
+        };
 
-        loop {
-            let module = vpi_sys::vpi_scan(iter);
-            if module.is_null() {
-                break;
-            }
-
-            // Get module name
-            let name_ptr = vpi_sys::vpi_get_str(crate::Property::Name as i32, module);
-            let name = if name_ptr.is_null() {
-                "Unknown".to_string()
-            } else {
-                std::ffi::CStr::from_ptr(name_ptr)
-                    .to_str()
-                    .unwrap_or("Unknown")
-                    .to_string()
-            };
-
-            // Get timescale
-            let timescale = Timescale::from_module(module);
-
-            results.push((name, timescale));
-        }
+        // SAFETY: The iterator yields a valid module handle for this iteration.
+        let timescale = unsafe { Timescale::from_module(module.as_raw()) };
+        results.push((name, timescale));
     }
 
     results
@@ -211,7 +246,7 @@ pub fn get_top_module_timescales() -> Vec<(String, Option<Timescale>)> {
 pub fn get_simulator_precision() -> i32 {
     unsafe {
         vpi_sys::vpi_get(
-            crate::Property::TimePrecision as PLI_INT32,
+            crate::Property::TimePrecision as vpi_sys::PLI_INT32,
             crate::Handle::null().as_raw(),
         )
     }
@@ -219,7 +254,27 @@ pub fn get_simulator_precision() -> i32 {
 
 #[cfg(test)]
 mod tests {
-    use super::{power_of_10_to_time_str, Timescale};
+    use super::{
+        power_of_10_to_time_str, try_simulator_info, try_simulator_name, try_simulator_version,
+        SimulatorInfoError, Timescale,
+    };
+
+    #[cfg(not(all(feature = "dynamic", any(target_os = "windows", target_os = "macos"))))]
+    #[test]
+    fn try_simulator_info_reports_unavailable_vpi_info() {
+        assert!(matches!(
+            try_simulator_info(),
+            Err(SimulatorInfoError::Unavailable)
+        ));
+        assert!(matches!(
+            try_simulator_name(),
+            Err(SimulatorInfoError::Unavailable)
+        ));
+        assert!(matches!(
+            try_simulator_version(),
+            Err(SimulatorInfoError::Unavailable)
+        ));
+    }
 
     #[test]
     fn maps_known_power_values_to_expected_units() {

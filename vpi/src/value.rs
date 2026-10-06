@@ -1,8 +1,7 @@
-use std::ffi::CString;
+use std::ffi::{CStr, CString};
 use std::fmt::Display;
 
 use num_derive::{FromPrimitive, ToPrimitive};
-use vpi_sys::PLI_INT32;
 
 #[cfg(feature = "verilator")]
 use crate::scalar_vector_to_vecval;
@@ -134,9 +133,15 @@ pub enum ValueType {
     /// 32-bit floating-point format.
     ShortReal = vpi_sys::vpiShortRealVal,
     /// Raw packed 2-state vector format.
+    ///
+    /// This is a Verilator array-value format; scalar reads, array reads, and
+    /// callback-value decoding are not currently supported for this format.
     #[cfg(feature = "verilator")]
     RawTwoState = vpi_sys::vpiRawTwoStateVal,
     /// Raw packed 4-state vector format.
+    ///
+    /// This is a Verilator array-value format; scalar reads, array reads, and
+    /// callback-value decoding are not currently supported for this format.
     #[cfg(feature = "verilator")]
     RawFourState = vpi_sys::vpiRawFourStateVal,
 }
@@ -648,6 +653,120 @@ bitflags::bitflags! {
     }
 }
 
+/// Errors returned when writing an array of VPI values.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PutValueArrayError {
+    /// The target handle is null.
+    NullHandle,
+    /// The target's declared array bounds are unavailable.
+    MissingArrayRange,
+    /// The requested first index is outside the declared array range.
+    StartIndexOutOfRange {
+        /// Requested first index.
+        index: i32,
+        /// Declared left bound.
+        left: i32,
+        /// Declared right bound.
+        right: i32,
+    },
+    /// The requested values extend beyond the array in its declared direction.
+    RangeOutOfBounds {
+        /// Requested first index.
+        start_index: i32,
+        /// Number of values to write.
+        count: usize,
+        /// Declared left bound.
+        left: i32,
+        /// Declared right bound.
+        right: i32,
+    },
+    /// The bulk VPI path does not support the values or they are not homogeneous.
+    UnsupportedValues,
+    /// The value count cannot be represented by the VPI array API.
+    TooManyValues,
+    /// An element handle within the validated range could not be resolved.
+    ElementUnavailable {
+        /// The unavailable declared array index.
+        index: i32,
+    },
+}
+
+impl std::fmt::Display for PutValueArrayError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::NullHandle => write!(f, "cannot write an array through a null handle"),
+            Self::MissingArrayRange => write!(f, "array bounds are unavailable"),
+            Self::StartIndexOutOfRange { index, left, right } => write!(
+                f,
+                "first index {index} is outside the declared range [{left}:{right}]"
+            ),
+            Self::RangeOutOfBounds {
+                start_index,
+                count,
+                left,
+                right,
+            } => write!(
+                f,
+                "writing {count} values from index {start_index} exceeds the declared range [{left}:{right}]"
+            ),
+            Self::UnsupportedValues => write!(
+                f,
+                "the bulk VPI array API requires a homogeneous supported value slice"
+            ),
+            Self::TooManyValues => write!(f, "value count exceeds the VPI array API limit"),
+            Self::ElementUnavailable { index } => {
+                write!(f, "array element at index {index} is unavailable")
+            }
+        }
+    }
+}
+
+impl std::error::Error for PutValueArrayError {}
+
+fn validate_array_write_range(
+    left: i32,
+    right: i32,
+    start_index: i32,
+    count: usize,
+) -> Result<i32, PutValueArrayError> {
+    let (min, max) = if left <= right {
+        (left, right)
+    } else {
+        (right, left)
+    };
+    if !(min..=max).contains(&start_index) {
+        return Err(PutValueArrayError::StartIndexOutOfRange {
+            index: start_index,
+            left,
+            right,
+        });
+    }
+
+    let step = if left <= right { 1 } else { -1 };
+    let remaining = if step > 0 {
+        i64::from(right) - i64::from(start_index)
+    } else {
+        i64::from(start_index) - i64::from(right)
+    };
+    let available = u64::try_from(remaining).map_err(|_| PutValueArrayError::RangeOutOfBounds {
+        start_index,
+        count,
+        left,
+        right,
+    })? + 1;
+    let requested = u64::try_from(count).map_err(|_| PutValueArrayError::TooManyValues)?;
+    if requested > available {
+        return Err(PutValueArrayError::RangeOutOfBounds {
+            start_index,
+            count,
+            left,
+            right,
+        });
+    }
+
+    Ok(step)
+}
+
 /// Decode a raw `t_vpi_value` into a high-level [`Value`].
 ///
 /// `obj` is used for value formats that require object context (for example,
@@ -658,59 +777,112 @@ pub(crate) fn decode_vpi_value(
     obj: vpi_sys::vpiHandle,
 ) -> Option<Value> {
     match raw_value.format as u32 {
-        vpi_sys::vpiBinStrVal => {
-            let c_str = unsafe { std::ffi::CStr::from_ptr(raw_value.value.str_) };
-            Some(Value::BinStr(c_str.to_str().unwrap_or("").to_string()))
-        }
-        vpi_sys::vpiOctStrVal => {
-            let c_str = unsafe { std::ffi::CStr::from_ptr(raw_value.value.str_) };
-            Some(Value::OctStr(c_str.to_str().unwrap_or("").to_string()))
-        }
-        vpi_sys::vpiHexStrVal => {
-            let c_str = unsafe { std::ffi::CStr::from_ptr(raw_value.value.str_) };
-            Some(Value::HexStr(c_str.to_str().unwrap_or("").to_string()))
-        }
-        vpi_sys::vpiDecStrVal => {
-            let c_str = unsafe { std::ffi::CStr::from_ptr(raw_value.value.str_) };
-            Some(Value::DecStr(c_str.to_str().unwrap_or("").to_string()))
-        }
+        vpi_sys::vpiBinStrVal => Some(Value::BinStr(copy_vpi_string(unsafe {
+            raw_value.value.str_
+        })?)),
+        vpi_sys::vpiOctStrVal => Some(Value::OctStr(copy_vpi_string(unsafe {
+            raw_value.value.str_
+        })?)),
+        vpi_sys::vpiHexStrVal => Some(Value::HexStr(copy_vpi_string(unsafe {
+            raw_value.value.str_
+        })?)),
+        vpi_sys::vpiDecStrVal => Some(Value::DecStr(copy_vpi_string(unsafe {
+            raw_value.value.str_
+        })?)),
         vpi_sys::vpiScalarVal => Some(Value::Scalar(
-            LogicVal::try_from(unsafe { raw_value.value.integer } as u32)
-                .unwrap_or(LogicVal::DontCare),
+            LogicVal::try_from(unsafe { raw_value.value.integer } as u32).ok()?,
         )),
         vpi_sys::vpiIntVal => Some(Value::Int(unsafe { raw_value.value.integer })),
         vpi_sys::vpiRealVal => Some(Value::Real(unsafe { raw_value.value.real })),
-        vpi_sys::vpiStringVal => {
-            let c_str = unsafe { std::ffi::CStr::from_ptr(raw_value.value.str_) };
-            Some(Value::String(c_str.to_str().unwrap_or("").to_string()))
-        }
+        vpi_sys::vpiStringVal => Some(Value::String(copy_vpi_string(unsafe {
+            raw_value.value.str_
+        })?)),
         vpi_sys::vpiObjTypeVal => Some(Value::ObjType(unsafe { raw_value.value.integer })),
         vpi_sys::vpiVectorVal => {
             let vec_ptr = unsafe { raw_value.value.vector };
-            if vec_ptr.is_null() {
-                Some(Value::Vector(LogicVec::empty()))
-            } else {
-                let size = if obj.is_null() {
-                    0usize
-                } else {
-                    unsafe { vpi_sys::vpi_get(vpi_sys::vpiSize as i32, obj) as usize }
-                };
-                let num_words = size.div_ceil(32);
-                let vec = unsafe { std::slice::from_raw_parts(vec_ptr, num_words) };
-                Some(Value::Vector(LogicVec::from_vecval(vec, size)))
+            if obj.is_null() {
+                return None;
             }
+            let raw_size = unsafe { vpi_sys::vpi_get(vpi_sys::vpiSize as i32, obj) };
+            let size = usize::try_from(raw_size).ok()?;
+            if size == 0 {
+                return Some(Value::Vector(LogicVec::empty()));
+            }
+            if vec_ptr.is_null() {
+                return None;
+            }
+            let num_words = size.div_ceil(32);
+            let vec = unsafe { std::slice::from_raw_parts(vec_ptr, num_words) };
+            Some(Value::Vector(LogicVec::from_vecval(vec, size)))
         }
         vpi_sys::vpiStrengthVal => {
-            let strength: vpi_sys::t_vpi_strengthval = unsafe { *raw_value.value.strength };
+            let ptr = unsafe { raw_value.value.strength };
+            if ptr.is_null() {
+                return None;
+            }
+            let strength: vpi_sys::t_vpi_strengthval = unsafe { *ptr };
             Some(Value::Strength(StrengthValue::from(strength)))
         }
         vpi_sys::vpiTimeVal => {
-            let vpi_time: vpi_sys::t_vpi_time = unsafe { *raw_value.value.time };
+            let ptr = unsafe { raw_value.value.time };
+            if ptr.is_null() {
+                return None;
+            }
+            let vpi_time: vpi_sys::t_vpi_time = unsafe { *ptr };
             Some(Value::Time(Time::from(vpi_time)))
         }
         vpi_sys::vpiShortIntVal => Some(Value::ShortInt(unsafe { raw_value.value.integer } as i16)),
         _ => None,
     }
+}
+
+fn copy_vpi_string(ptr: *mut vpi_sys::PLI_BYTE8) -> Option<String> {
+    if ptr.is_null() {
+        None
+    } else {
+        Some(
+            unsafe { CStr::from_ptr(ptr.cast()) }
+                .to_string_lossy()
+                .into_owned(),
+        )
+    }
+}
+
+fn checked_array_size(raw_size: vpi_sys::PLI_INT32) -> Option<(usize, vpi_sys::PLI_UINT32)> {
+    let size = usize::try_from(raw_size).ok()?;
+    let count = vpi_sys::PLI_UINT32::try_from(size).ok()?;
+    Some((size, count))
+}
+
+#[cfg(feature = "value_array")]
+fn supports_value_array_format(format: ValueType) -> bool {
+    matches!(
+        format,
+        ValueType::Int
+            | ValueType::Real
+            | ValueType::Time
+            | ValueType::ShortInt
+            | ValueType::LongInt
+            | ValueType::ShortReal
+            | ValueType::Vector
+            | ValueType::Scalar
+    )
+}
+
+fn array_indices(left: i32, right: i32, expected_size: usize) -> Option<Vec<i32>> {
+    let distance = i64::from(left).abs_diff(i64::from(right));
+    let size = usize::try_from(distance.checked_add(1)?).ok()?;
+    if size != expected_size {
+        return None;
+    }
+
+    let step = if left <= right { 1i64 } else { -1i64 };
+    (0..size)
+        .map(|offset| {
+            let offset = i64::try_from(offset).ok()?;
+            i32::try_from(i64::from(left) + step * offset).ok()
+        })
+        .collect()
 }
 
 /// Demote a homogeneous [`Value`] array to [`String`] values.
@@ -1341,7 +1513,7 @@ impl Handle {
             vpi_sys::vpi_put_value(self.as_raw(), &raw mut payload.raw, raw_time_ptr, raw_flags)
         };
 
-        Handle::from_raw(event)
+        Handle::from_vpi(event)
     }
 
     /// Writes an integer value to this handle using `vpi_put_value` with no delay.
@@ -1357,17 +1529,33 @@ impl Handle {
     ///
     /// The input slice must be homogeneous and currently supports integer,
     /// short integer, long integer, real, short real, and time values.
-    /// Returns `false` for null handles or unsupported/mixed value slices.
+    /// Writes from the array's declared left bound.
+    ///
+    /// Returns an error if the handle is null, array bounds are unavailable,
+    /// the write would exceed the declared range, or values are unsupported.
     #[must_use]
     #[cfg(feature = "value_array")]
-    pub fn put_value_array(&self, values: impl AsRef<[Value]>) -> bool {
-        self.put_value_array_with_flags(values, 0, PutValueArrayFlags::empty())
+    pub fn put_value_array(&self, values: impl AsRef<[Value]>) -> Result<(), PutValueArrayError> {
+        let values = values.as_ref();
+        if self.is_null() {
+            return Err(PutValueArrayError::NullHandle);
+        }
+        if values.is_empty() {
+            return Ok(());
+        }
+        let start_index = self
+            .get_left_range()
+            .ok_or(PutValueArrayError::MissingArrayRange)?;
+        self.put_value_array_with_flags(values, start_index, PutValueArrayFlags::empty())
     }
 
     /// Writes an array of values to this handle using `vpi_put_value_array`.
     ///
     /// `start_index` selects the first array element to update.
-    /// Returns `false` for null handles or unsupported/mixed value slices.
+    /// Subsequent values follow the array's declared index direction.
+    ///
+    /// Returns an error if the handle is null, array bounds are unavailable,
+    /// the requested range is out of bounds, or values are unsupported.
     #[must_use]
     #[cfg(feature = "value_array")]
     pub fn put_value_array_with_flags(
@@ -1375,87 +1563,125 @@ impl Handle {
         values: impl AsRef<[Value]>,
         start_index: i32,
         flags: PutValueArrayFlags,
-    ) -> bool {
+    ) -> Result<(), PutValueArrayError> {
         if self.is_null() {
-            return false;
+            return Err(PutValueArrayError::NullHandle);
         }
         let values = values.as_ref();
         if values.is_empty() {
-            return true;
+            return Ok(());
         }
 
-        let Some(mut payload) = encode_value_array_for_put(values, flags) else {
-            return false;
-        };
+        let left = self
+            .get_left_range()
+            .ok_or(PutValueArrayError::MissingArrayRange)?;
+        let right = self
+            .get_right_range()
+            .ok_or(PutValueArrayError::MissingArrayRange)?;
+        validate_array_write_range(left, right, start_index, values.len())?;
 
-        let Ok(num) = vpi_sys::PLI_UINT32::try_from(values.len()) else {
-            return false;
+        let num = vpi_sys::PLI_UINT32::try_from(values.len())
+            .map_err(|_| PutValueArrayError::TooManyValues)?;
+
+        let Some(mut payload) = encode_value_array_for_put(values, flags) else {
+            return Err(PutValueArrayError::UnsupportedValues);
         };
 
         let mut index = start_index;
         unsafe {
             vpi_sys::vpi_put_value_array(self.as_raw(), &raw mut payload.raw, &raw mut index, num);
         }
-        true
+        Ok(())
     }
 
     /// Writes an array of values to this handle.
     ///
     /// This fallback implementation is used when the `put_value_array`
     /// feature is disabled and applies each value element-by-element using
-    /// [`Handle::put_value`] on `handle_by_index(start_index + i)`.
-    /// Returns `false` for null handles or when any indexed element is
-    /// unavailable.
-    #[must_use]
+    /// [`Handle::put_value`] on each declared index starting at the array's
+    /// left bound.
+    ///
+    /// Returns an error if the handle is null, array bounds are unavailable,
+    /// the write would exceed the declared range, or an element is unavailable.
     #[cfg(not(feature = "value_array"))]
-    pub fn put_value_array(&self, values: impl AsRef<[Value]>) -> bool {
-        self.put_value_array_with_flags(values, 0, &PutValueArrayFlags::empty())
+    pub fn put_value_array(&self, values: impl AsRef<[Value]>) -> Result<(), PutValueArrayError> {
+        let values = values.as_ref();
+        if self.is_null() {
+            return Err(PutValueArrayError::NullHandle);
+        }
+        if values.is_empty() {
+            return Ok(());
+        }
+        let start_index = self
+            .get_left_range()
+            .ok_or(PutValueArrayError::MissingArrayRange)?;
+        self.put_value_array_with_flags(values, start_index, &PutValueArrayFlags::empty())
     }
 
     /// Writes an array of values to this handle.
     ///
     /// This fallback implementation is used when the `put_value_array`
     /// feature is disabled and applies each value element-by-element using
-    /// [`Handle::put_value`] on `handle_by_index(start_index + i)`.
+    /// [`Handle::put_value`] on each declared index starting at `start_index`.
     ///
     /// `start_index` selects the first array element to update.
     ///
     /// Note: `flags` are accepted for API compatibility but are ignored by
     /// this fallback path.
     ///
-    /// Returns `false` for null handles, out-of-range indices, or arithmetic
-    /// overflow while advancing indices.
-    #[must_use]
+    /// Subsequent values follow the array's declared index direction.
+    ///
+    /// Returns an error if the handle is null, array bounds are unavailable,
+    /// the requested range is out of bounds, or an element is unavailable.
     #[cfg(not(feature = "value_array"))]
     pub fn put_value_array_with_flags(
         &self,
         values: impl AsRef<[Value]>,
         start_index: i32,
         flags: &PutValueArrayFlags,
-    ) -> bool {
+    ) -> Result<(), PutValueArrayError> {
         if self.is_null() {
-            return false;
+            return Err(PutValueArrayError::NullHandle);
         }
 
+        let values = values.as_ref();
+        if values.is_empty() {
+            return Ok(());
+        }
+
+        let left = self
+            .get_left_range()
+            .ok_or(PutValueArrayError::MissingArrayRange)?;
+        let right = self
+            .get_right_range()
+            .ok_or(PutValueArrayError::MissingArrayRange)?;
+        let step = validate_array_write_range(left, right, start_index, values.len())?;
         let _ = flags;
 
-        for (offset, value) in values.as_ref().iter().enumerate() {
-            let Ok(offset) = i32::try_from(offset) else {
-                return false;
-            };
-            let Some(index) = start_index.checked_add(offset) else {
-                return false;
-            };
-
+        let mut elements = Vec::with_capacity(values.len());
+        for offset in 0..values.len() {
+            let offset = i64::try_from(offset).map_err(|_| PutValueArrayError::TooManyValues)?;
+            let index =
+                i32::try_from(i64::from(start_index) + i64::from(step) * offset).map_err(|_| {
+                    PutValueArrayError::RangeOutOfBounds {
+                        start_index,
+                        count: values.len(),
+                        left,
+                        right,
+                    }
+                })?;
             let element = self.handle_by_index(index);
             if element.is_null() {
-                return false;
+                return Err(PutValueArrayError::ElementUnavailable { index });
             }
+            elements.push(element);
+        }
 
+        for (element, value) in elements.iter().zip(values) {
             let _ = element.put_value(value);
         }
 
-        true
+        Ok(())
     }
 
     /// Reads a value from this handle in the requested format.
@@ -1465,10 +1691,17 @@ impl Handle {
     /// this method returns the matching concrete [`Value`] variant rather than
     /// always returning [`Value::ObjType`].
     ///
+    /// Verilator raw formats are not valid for scalar `t_vpi_value` reads and
+    /// return `None`.
+    ///
     /// Returns `None` for null handles or unsupported formats.
     #[must_use]
     pub fn get_value(&self, format: ValueType) -> Option<Value> {
         if self.is_null() {
+            return None;
+        }
+        #[cfg(feature = "verilator")]
+        if matches!(format, ValueType::RawTwoState | ValueType::RawFourState) {
             return None;
         }
         let mut value = vpi_sys::t_vpi_value {
@@ -1507,12 +1740,19 @@ impl Handle {
             return None;
         }
 
-        let size =
-            unsafe { vpi_sys::vpi_get(vpi_sys::vpiSize as PLI_INT32, self.as_raw()) } as usize;
+        if !supports_value_array_format(format) {
+            return None;
+        }
+
+        let raw_size =
+            unsafe { vpi_sys::vpi_get(vpi_sys::vpiSize as vpi_sys::PLI_INT32, self.as_raw()) };
+        let (size, count) = checked_array_size(raw_size)?;
 
         if size == 0 {
             return Some(Vec::new());
         }
+
+        let mut index = self.get_left_range()?;
 
         match format {
             ValueType::Int => {
@@ -1524,14 +1764,12 @@ impl Handle {
                         integers: integers.as_mut_ptr(),
                     },
                 };
-                let mut index = 0;
-
                 unsafe {
                     vpi_sys::vpi_get_value_array(
                         self.as_raw(),
                         &raw mut arrayvalue,
                         &raw mut index,
-                        size as vpi_sys::PLI_UINT32,
+                        count,
                     );
                 }
 
@@ -1546,14 +1784,12 @@ impl Handle {
                         reals: reals.as_mut_ptr(),
                     },
                 };
-                let mut index = 0;
-
                 unsafe {
                     vpi_sys::vpi_get_value_array(
                         self.as_raw(),
                         &raw mut arrayvalue,
                         &raw mut index,
-                        size as vpi_sys::PLI_UINT32,
+                        count,
                     );
                 }
 
@@ -1576,14 +1812,12 @@ impl Handle {
                         times: times.as_mut_ptr(),
                     },
                 };
-                let mut index = 0;
-
                 unsafe {
                     vpi_sys::vpi_get_value_array(
                         self.as_raw(),
                         &raw mut arrayvalue,
                         &raw mut index,
-                        size as vpi_sys::PLI_UINT32,
+                        count,
                     );
                 }
 
@@ -1611,14 +1845,12 @@ impl Handle {
                         shortints: shortints.as_mut_ptr(),
                     },
                 };
-                let mut index = 0;
-
                 unsafe {
                     vpi_sys::vpi_get_value_array(
                         self.as_raw(),
                         &raw mut arrayvalue,
                         &raw mut index,
-                        size as vpi_sys::PLI_UINT32,
+                        count,
                     );
                 }
 
@@ -1638,14 +1870,12 @@ impl Handle {
                         longints: longints.as_mut_ptr(),
                     },
                 };
-                let mut index = 0;
-
                 unsafe {
                     vpi_sys::vpi_get_value_array(
                         self.as_raw(),
                         &raw mut arrayvalue,
                         &raw mut index,
-                        size as vpi_sys::PLI_UINT32,
+                        count,
                     );
                 }
 
@@ -1665,14 +1895,12 @@ impl Handle {
                         shortreals: shortreals.as_mut_ptr(),
                     },
                 };
-                let mut index = 0;
-
                 unsafe {
                     vpi_sys::vpi_get_value_array(
                         self.as_raw(),
                         &raw mut arrayvalue,
                         &raw mut index,
-                        size as vpi_sys::PLI_UINT32,
+                        count,
                     );
                 }
 
@@ -1684,13 +1912,14 @@ impl Handle {
                 )
             }
             ValueType::Vector => {
-                // For vector arrays, each element needs to be read individually
-                // as the size calculation is different (bits per element vs. total bits)
+                let indices = array_indices(self.get_left_range()?, self.get_right_range()?, size)?;
                 let mut values = Vec::with_capacity(size);
-                for _ in 0..size {
-                    if let Some(val) = self.get_value(ValueType::Vector) {
-                        values.push(val);
+                for index in indices {
+                    let element = self.handle_by_index(index);
+                    if element.is_null() {
+                        return None;
                     }
+                    values.push(element.get_value(ValueType::Vector)?);
                 }
                 Some(values)
             }
@@ -1704,28 +1933,22 @@ impl Handle {
                         rawvals: rawvals.as_mut_ptr(),
                     },
                 };
-                let mut index = 0;
-
                 unsafe {
                     vpi_sys::vpi_get_value_array(
                         self.as_raw(),
                         &raw mut arrayvalue,
                         &raw mut index,
-                        size as vpi_sys::PLI_UINT32,
+                        count,
                     );
                 }
 
-                Some(
-                    rawvals
-                        .into_iter()
-                        .filter_map(|v| LogicVal::try_from(v as u8).ok().map(Value::Scalar))
-                        .collect::<Vec<Value>>(),
-                )
+                let scalars = rawvals
+                    .into_iter()
+                    .map(|value| LogicVal::try_from(value as u8).ok())
+                    .collect::<Option<Vec<_>>>()?;
+                Some(scalars.into_iter().map(Value::Scalar).collect())
             }
-            _ => {
-                // For unsupported types, return empty vector
-                Some(Vec::new())
-            }
+            _ => None,
         }
     }
 
@@ -1744,15 +1967,15 @@ impl Handle {
             return None;
         }
 
-        let raw_size = unsafe { vpi_sys::vpi_get(vpi_sys::vpiSize as PLI_INT32, self.as_raw()) };
-        let size = usize::try_from(raw_size).ok()?;
-
+        let raw_size =
+            unsafe { vpi_sys::vpi_get(vpi_sys::vpiSize as vpi_sys::PLI_INT32, self.as_raw()) };
+        let (size, _) = checked_array_size(raw_size)?;
+        if size == 0 {
+            return Some(Vec::new());
+        }
+        let indices = array_indices(self.get_left_range()?, self.get_right_range()?, size)?;
         let mut values = Vec::with_capacity(size);
-        for index in 0..size {
-            let Ok(index) = i32::try_from(index) else {
-                return None;
-            };
-
+        for index in indices {
             let element = self.handle_by_index(index);
             if element.is_null() {
                 return None;
@@ -1778,10 +2001,12 @@ impl Handle {
 #[cfg(test)]
 mod tests {
     use super::{
-        cstring_lossy_no_nul, encode_value_for_put, strength_array_to_value_array,
-        string_array_to_value_array, time_array_to_value_array, value_array_to_int_array,
+        array_indices, checked_array_size, copy_vpi_string, cstring_lossy_no_nul, decode_vpi_value,
+        encode_value_for_put, strength_array_to_value_array, string_array_to_value_array,
+        time_array_to_value_array, validate_array_write_range, value_array_to_int_array,
         value_array_to_strength_array, value_array_to_string_array, value_array_to_time_array,
-        LogicVal, LogicVec, PutValueArrayFlags, PutValueDelay, PutValueFlags, Value, ValueType,
+        LogicVal, LogicVec, PutValueArrayError, PutValueArrayFlags, PutValueDelay, PutValueFlags,
+        Value, ValueType,
     };
     use crate::{Handle, Strength, StrengthValue, Time};
 
@@ -1789,6 +2014,78 @@ mod tests {
     fn cstring_lossy_no_nul_strips_interior_nuls() {
         let cstr = cstring_lossy_no_nul("ab\0cd");
         assert_eq!(cstr.to_bytes(), b"abcd");
+    }
+
+    #[test]
+    fn value_decoder_rejects_null_c_strings_and_payloads() {
+        assert_eq!(copy_vpi_string(std::ptr::null_mut()), None);
+
+        let null_string = vpi_sys::t_vpi_value {
+            format: vpi_sys::vpiStringVal as i32,
+            value: vpi_sys::t_vpi_value__bindgen_ty_1 {
+                str_: std::ptr::null_mut(),
+            },
+        };
+        assert_eq!(decode_vpi_value(null_string, std::ptr::null_mut()), None);
+
+        let null_strength = vpi_sys::t_vpi_value {
+            format: vpi_sys::vpiStrengthVal as i32,
+            value: vpi_sys::t_vpi_value__bindgen_ty_1 {
+                strength: std::ptr::null_mut(),
+            },
+        };
+        assert_eq!(decode_vpi_value(null_strength, std::ptr::null_mut()), None);
+
+        let invalid_scalar = vpi_sys::t_vpi_value {
+            format: vpi_sys::vpiScalarVal as i32,
+            value: vpi_sys::t_vpi_value__bindgen_ty_1 { integer: -1 },
+        };
+        assert_eq!(decode_vpi_value(invalid_scalar, std::ptr::null_mut()), None);
+    }
+
+    #[test]
+    fn checked_array_size_rejects_negative_values() {
+        assert_eq!(checked_array_size(-1), None);
+        assert_eq!(checked_array_size(0), Some((0, 0)));
+        assert_eq!(checked_array_size(3), Some((3, 3)));
+    }
+
+    #[test]
+    fn array_indices_follow_declared_direction_and_bounds() {
+        assert_eq!(array_indices(2, 4, 3), Some(vec![2, 3, 4]));
+        assert_eq!(array_indices(4, 2, 3), Some(vec![4, 3, 2]));
+        assert_eq!(array_indices(-2, 1, 3), None);
+    }
+
+    #[test]
+    fn array_write_range_follows_declared_direction_and_checks_bounds() {
+        assert_eq!(validate_array_write_range(2, 5, 3, 3), Ok(1));
+        assert_eq!(validate_array_write_range(5, 2, 4, 3), Ok(-1));
+        assert_eq!(
+            validate_array_write_range(2, 5, 1, 1),
+            Err(PutValueArrayError::StartIndexOutOfRange {
+                index: 1,
+                left: 2,
+                right: 5,
+            })
+        );
+        assert_eq!(
+            validate_array_write_range(5, 2, 3, 3),
+            Err(PutValueArrayError::RangeOutOfBounds {
+                start_index: 3,
+                count: 3,
+                left: 5,
+                right: 2,
+            })
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "value_array")]
+    fn value_array_support_is_explicit_for_requested_formats() {
+        assert!(super::supports_value_array_format(ValueType::Vector));
+        assert!(!super::supports_value_array_format(ValueType::String));
+        assert!(!super::supports_value_array_format(ValueType::ObjType));
     }
 
     #[test]
