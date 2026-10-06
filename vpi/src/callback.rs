@@ -75,6 +75,10 @@ pub enum CbReason {
     /// Callback at the end of the current simulation time.
     AtEndOfSimTime = vpi_sys::cbAtEndOfSimTime,
 
+    /// Internal fallback for callback reasons not recognized by this crate.
+    #[doc(hidden)]
+    Unknown = u32::MAX,
+
     #[cfg(feature = "sv")]
     // SystemVerilog thread callbacks (600-605)
     /// Callback on thread creation.
@@ -233,6 +237,16 @@ fn time_from_cb_data(raw_time: vpi_sys::s_vpi_time) -> Option<Time> {
         vpi_sys::vpiScaledRealTime => Some(Time::ScaledReal(raw_time.real)),
         vpi_sys::vpiSuppressTime => Some(Time::Suppress),
         _ => None,
+    }
+}
+
+fn callback_reason(raw_reason: i32) -> CbReason {
+    CbReason::from_u32(raw_reason as u32).unwrap_or(CbReason::Unknown)
+}
+
+fn invoke_callback(callback: impl FnOnce()) {
+    if std::panic::catch_unwind(std::panic::AssertUnwindSafe(callback)).is_err() {
+        eprintln!("Rust VPI callback panicked; panic was contained at the VPI callback boundary");
     }
 }
 
@@ -401,7 +415,7 @@ fn decode_assertion_attempt_info(
                 Vec::new()
             } else {
                 let slice = unsafe { std::slice::from_raw_parts(step_ref.matched_exprs, count) };
-                slice.iter().copied().map(Handle::from_raw).collect()
+                slice.iter().copied().map(Handle::from_vpi).collect()
             };
 
             AssertionAttemptDetail::Step(AssertionStepInfo {
@@ -412,7 +426,7 @@ fn decode_assertion_attempt_info(
         }
         _ => {
             let fail_expr = unsafe { info_ref.detail.failExpr };
-            AssertionAttemptDetail::FailExpr(Handle::from_raw(fail_expr))
+            AssertionAttemptDetail::FailExpr(Handle::from_vpi(fail_expr))
         }
     };
 
@@ -439,23 +453,25 @@ unsafe extern "C" fn assertion_trampoline(
         return 0;
     }
 
-    let Some(reason) = CbReason::from_u32(reason as u32) else {
-        return 0;
-    };
+    let reason = callback_reason(reason);
 
     let mut data = AssertionCbData {
         reason,
-        assertion: Handle::from_raw(assertion),
+        assertion: Handle::from_vpi(assertion),
         time: if cb_time.is_null() {
             None
         } else {
             time_from_cb_data(unsafe { *cb_time })
         },
-        attempt_info: decode_assertion_attempt_info(reason, info),
+        attempt_info: if reason == CbReason::Unknown {
+            None
+        } else {
+            decode_assertion_attempt_info(reason, info)
+        },
     };
 
     let state = unsafe { &*state_ptr };
-    (state.callback)(&data);
+    invoke_callback(|| (state.callback)(&data));
     data.assertion.clear();
     0
 }
@@ -502,13 +518,15 @@ fn register_with_state(
         register_callback_state(handle, state_ptr);
     }
 
-    Handle::from_raw(handle)
+    Handle::from_vpi(handle)
 }
 
 impl Handle {
     /// Registers a callback associated with this handle.
     ///
     /// Returns a callback handle that can be removed with [`remove_cb`].
+    /// Dropping the returned handle alone does not unregister the callback or
+    /// release its stored closure; remove it explicitly when no longer needed.
     pub fn register_cb<F>(&self, reason: CbReason, callback: F) -> Handle
     where
         F: Fn(&CbData) + 'static,
@@ -541,14 +559,15 @@ impl Handle {
             register_callback_state(handle, user_data.cast::<CallbackState>());
         }
 
-        Handle::from_raw(handle)
+        Handle::from_vpi(handle)
     }
 
     /// Registers a callback with persistent time/value registration buffers.
     ///
     /// This variant populates `t_cb_data.time` and `t_cb_data.value` at
     /// registration time so simulators can write callback payloads through
-    /// those pointers.
+    /// those pointers. The returned handle must be passed to [`remove_cb`];
+    /// dropping it alone does not unregister the callback.
     pub fn register_full_cb<F>(&self, reason: CbReason, callback: F) -> Handle
     where
         F: Fn(&CbData) + 'static,
@@ -565,7 +584,8 @@ impl Handle {
     ///
     /// Some simulators require `t_cb_data.value.format` to match the expected
     /// callback value encoding for `cbValueChange` callbacks. This helper sets
-    /// that format during registration.
+    /// that format during registration. The returned handle must be passed to
+    /// [`remove_cb`]; dropping it alone does not unregister the callback.
     pub fn register_value_change_cb<F>(&self, value_type: ValueType, callback: F) -> Handle
     where
         F: Fn(&CbData) + 'static,
@@ -597,9 +617,8 @@ unsafe extern "C" fn trampoline(cb_data: *mut vpi_sys::t_cb_data) -> i32 {
     };
 
     let mut data = CbData {
-        reason: CbReason::from_u32(cb_data_ref.reason as u32)
-            .expect("received unknown callback reason from simulator"),
-        obj: Handle::from_raw(cb_data_ref.obj),
+        reason: callback_reason(cb_data_ref.reason),
+        obj: Handle::from_vpi(cb_data_ref.obj),
         time: if cb_data_ref.time.is_null() {
             None
         } else {
@@ -611,15 +630,36 @@ unsafe extern "C" fn trampoline(cb_data: *mut vpi_sys::t_cb_data) -> i32 {
     };
 
     let state = unsafe { &*user_data };
-    (state.callback)(&data);
+    invoke_callback(|| (state.callback)(&data));
 
     data.obj.clear(); // We do not own this handle
     0 // Return 0 to indicate success
 }
 
+#[cfg(test)]
+mod tests {
+    use super::{callback_reason, invoke_callback, CbReason};
+
+    #[test]
+    fn unknown_callback_reasons_use_the_fallback_variant() {
+        assert_eq!(callback_reason(123_456), CbReason::Unknown);
+        assert_eq!(
+            callback_reason(CbReason::StartOfSimulation as i32),
+            CbReason::StartOfSimulation
+        );
+    }
+
+    #[test]
+    fn callback_panics_are_contained() {
+        invoke_callback(|| panic!("test callback panic"));
+    }
+}
+
 /// Registers a global callback not tied to a specific object handle.
 ///
 /// Returns a callback handle that can be removed with [`remove_cb`].
+/// Dropping the returned handle alone does not unregister the callback or
+/// release its stored closure.
 pub fn register_cb<F>(reason: CbReason, callback: F) -> Handle
 where
     F: Fn(&CbData) + 'static,
@@ -652,14 +692,15 @@ where
         register_callback_state(handle, user_data.cast::<CallbackState>());
     }
 
-    Handle::from_raw(handle)
+    Handle::from_vpi(handle)
 }
 
 /// Registers a global callback with persistent time/value registration buffers.
 ///
 /// This variant populates `t_cb_data.time` and `t_cb_data.value` at
 /// registration time so simulators can write callback payloads through
-/// those pointers.
+/// those pointers. The returned handle must be passed to [`remove_cb`];
+/// dropping it alone does not unregister the callback.
 pub fn register_full_cb<F>(reason: CbReason, callback: F) -> Handle
 where
     F: Fn(&CbData) + 'static,
@@ -675,7 +716,8 @@ where
 /// Registers a time-based callback.
 ///
 /// The callback is scheduled according to `reason` and `time` as interpreted
-/// by the simulator.
+/// by the simulator. The returned handle must be passed to [`remove_cb`];
+/// dropping it alone does not unregister the callback.
 pub fn register_cb_with_time<F>(reason: CbReason, time: Time, callback: F) -> Handle
 where
     F: Fn(&CbData) + 'static,
@@ -690,7 +732,9 @@ where
 
 /// Registers a SystemVerilog assertion callback.
 ///
-/// Available only with the `sv` feature.
+/// Available only with the `sv` feature. The returned handle must be passed to
+/// [`remove_assertion_cb`]; dropping it alone does not unregister the callback
+/// or release its stored closure.
 #[cfg(feature = "sv")]
 pub fn register_assertion_cb<F>(assertion: &Handle, reason: CbReason, callback: F) -> Handle
 where
@@ -717,7 +761,7 @@ where
         register_assertion_callback_state(handle, state_ptr);
     }
 
-    Handle::from_raw(handle)
+    Handle::from_vpi(handle)
 }
 
 /// Removes a previously registered SystemVerilog assertion callback.

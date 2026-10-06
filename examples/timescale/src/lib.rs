@@ -21,20 +21,17 @@ fn timescale_callback(_cb_data: &vpi::CbData) {
     } else {
         println!("Module timescales:");
         for (module_name, timescale) in timescales {
-            match timescale {
-                Some(ts) => {
-                    println!("  {module_name} : {ts}");
-                    println!("    Unit: {} (10^{} s)", ts.unit_str(), ts.unit);
-                    println!(
-                        "    Precision: {} (10^{} s)",
-                        ts.precision_str(),
-                        ts.precision
-                    );
-                }
-                None => {
-                    println!("  {module_name} : No timescale defined");
-                }
-            }
+            println!("  {module_name} : {timescale}");
+            println!(
+                "    Unit: {} (10^{} s)",
+                timescale.unit_str(),
+                timescale.unit
+            );
+            println!(
+                "    Precision: {} (10^{} s)",
+                timescale.precision_str(),
+                timescale.precision
+            );
         }
     }
 

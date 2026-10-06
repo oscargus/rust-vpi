@@ -33,7 +33,7 @@ vpi-shim is a small shim crate to enable dynamic lookup of VPI symbols at runtim
 
 ## Examples
 
-There are examples in `test_example` to see how the crate can be used.
+There are examples in `examples/` to see how the crate can be used.
 
 ## Coverage
 

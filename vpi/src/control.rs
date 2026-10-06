@@ -1,5 +1,3 @@
-use vpi_sys::PLI_INT32;
-
 /// Simulator control operations for `vpi_control`.
 #[repr(u32)]
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -95,12 +93,12 @@ pub enum AssertionControl {
 /// Invokes `vpi_control` with the selected operation.
 pub fn control(control: Control) {
     unsafe {
-        vpi_sys::vpi_control(control as PLI_INT32);
+        vpi_sys::vpi_control(control as vpi_sys::PLI_INT32);
     }
 }
 
 #[cfg(feature = "sv")]
-fn control_sv(code: PLI_INT32) {
+fn control_sv(code: vpi_sys::PLI_INT32) {
     unsafe {
         vpi_sys::vpi_control(code);
     }
@@ -109,11 +107,11 @@ fn control_sv(code: PLI_INT32) {
 /// Invokes `vpi_control` with a SystemVerilog coverage control operation.
 #[cfg(feature = "sv")]
 pub fn coverage_control(control: CoverageControl) {
-    control_sv(control as PLI_INT32);
+    control_sv(control as vpi_sys::PLI_INT32);
 }
 
 /// Invokes `vpi_control` with a SystemVerilog assertion control operation.
 #[cfg(feature = "sv")]
 pub fn assertion_control(control: AssertionControl) {
-    control_sv(control as PLI_INT32);
+    control_sv(control as vpi_sys::PLI_INT32);
 }

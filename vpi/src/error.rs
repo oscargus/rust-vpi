@@ -83,12 +83,56 @@ impl std::fmt::Display for VPIError {
         )
     }
 }
+
+/// Missing required data returned by `vpi_chk_error`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum VPIErrorInfoError {
+    /// The simulator reported an error without a code string.
+    MissingCode,
+    /// The simulator reported an error without a message string.
+    MissingMessage,
+    /// The simulator reported an error without a product string.
+    MissingProduct,
+}
+
+impl std::fmt::Display for VPIErrorInfoError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::MissingCode => write!(f, "VPI error information has no code"),
+            Self::MissingMessage => write!(f, "VPI error information has no message"),
+            Self::MissingProduct => write!(f, "VPI error information has no product"),
+        }
+    }
+}
+
+impl std::error::Error for VPIErrorInfoError {}
+
+fn copy_c_string(ptr: *const std::ffi::c_char) -> Option<String> {
+    if ptr.is_null() {
+        None
+    } else {
+        Some(
+            unsafe { std::ffi::CStr::from_ptr(ptr) }
+                .to_string_lossy()
+                .into_owned(),
+        )
+    }
+}
+
 /// Checks whether the simulator has a pending VPI error.
 ///
 /// Returns `None` when no error is present, otherwise returns the translated
 /// [`VPIError`] payload.
 #[must_use]
 pub fn chk_error() -> Option<VPIError> {
+    try_chk_error().expect("simulator returned incomplete VPI error information")
+}
+
+/// Fallible version of [`chk_error`].
+///
+/// Returns `Ok(None)` when no error is pending. Returns an error if the
+/// simulator reports an error but omits a required string field.
+pub fn try_chk_error() -> Result<Option<VPIError>, VPIErrorInfoError> {
     let mut error_info = vpi_sys::t_vpi_error_info {
         code: std::ptr::null_mut(),
         message: std::ptr::null_mut(),
@@ -100,35 +144,20 @@ pub fn chk_error() -> Option<VPIError> {
     };
     let error_code = unsafe { vpi_sys::vpi_chk_error(&raw mut error_info) };
     if error_code == 0 {
-        None
+        Ok(None)
     } else {
-        Some(VPIError {
-            code: unsafe { std::ffi::CStr::from_ptr(error_info.code) }
-                .to_str()
-                .unwrap_or("Unknown")
-                .to_string(),
-            message: unsafe { std::ffi::CStr::from_ptr(error_info.message) }
-                .to_str()
-                .unwrap_or("Unknown")
-                .to_string(),
-            file: if error_info.file.is_null() {
-                None
-            } else {
-                Some(
-                    unsafe { std::ffi::CStr::from_ptr(error_info.file) }
-                        .to_str()
-                        .unwrap_or("Unknown")
-                        .to_string(),
-                )
-            },
+        let code = copy_c_string(error_info.code).ok_or(VPIErrorInfoError::MissingCode)?;
+        let message = copy_c_string(error_info.message).ok_or(VPIErrorInfoError::MissingMessage)?;
+        let product = copy_c_string(error_info.product).ok_or(VPIErrorInfoError::MissingProduct)?;
+        Ok(Some(VPIError {
+            code,
+            message,
+            file: copy_c_string(error_info.file),
             line: error_info.line,
             severity: Severity::from_i32(error_info.level),
             state: ErrorState::from_i32(error_info.state),
-            product: unsafe { std::ffi::CStr::from_ptr(error_info.product) }
-                .to_str()
-                .unwrap_or("Unknown")
-                .to_string(),
-        })
+            product,
+        }))
     }
 }
 
@@ -136,4 +165,23 @@ pub fn chk_error() -> Option<VPIError> {
 #[must_use]
 pub fn check_error() -> Option<VPIError> {
     chk_error()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{try_chk_error, VPIErrorInfoError};
+
+    #[cfg(not(all(feature = "dynamic", any(target_os = "windows", target_os = "macos"))))]
+    #[test]
+    fn try_chk_error_returns_none_when_no_error_is_pending() {
+        assert!(matches!(try_chk_error(), Ok(None)));
+    }
+
+    #[test]
+    fn missing_c_string_is_reported() {
+        assert_eq!(super::copy_c_string(std::ptr::null()), None::<String>);
+
+        let error = VPIErrorInfoError::MissingMessage;
+        assert_eq!(error.to_string(), "VPI error information has no message");
+    }
 }

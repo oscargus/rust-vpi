@@ -102,7 +102,7 @@ pub enum SystfKind {
 #[must_use]
 pub fn register_systf_raw(data: &mut RawSystfData) -> Handle {
     let handle = unsafe { vpi_sys::vpi_register_systf(data) };
-    Handle::from_raw(handle)
+    Handle::from_vpi(handle)
 }
 
 /// Registers a system task or function with typed inputs.
