@@ -129,6 +129,11 @@ unsafe extern "C" fn vpi_chk_error(_error_info_p: vpi_sys::p_vpi_error_info) -> 
 }
 
 #[unsafe(no_mangle)]
+unsafe extern "C" fn vpi_free_object(_object: vpi_sys::vpiHandle) -> vpi_sys::PLI_INT32 {
+    0
+}
+
+#[unsafe(no_mangle)]
 unsafe extern "C" fn vpi_release_handle(_object: vpi_sys::vpiHandle) -> vpi_sys::PLI_INT32 {
     0
 }

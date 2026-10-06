@@ -1,0 +1,15 @@
+(DELAYFILE
+  (SDFVERSION "3.0")
+  (DESIGN "top")
+  (TIMESCALE 1ns)
+  (CELL
+    (CELLTYPE "top")
+    (INSTANCE)
+    (DELAY
+      (ABSOLUTE
+        (INTERCONNECT u_drv.y u_rcv.d  (0.5:0.6:0.7) (0.3:0.4:0.5))
+        (INTERCONNECT u_rcv.q u_rcv2.d (1.0) (1.2))
+      )
+    )
+  )
+)

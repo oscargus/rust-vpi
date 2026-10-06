@@ -11,6 +11,8 @@ use std::ffi::c_int;
 #[cfg(any(target_os = "windows", target_os = "macos"))]
 use std::ffi::{c_char, c_void, CStr};
 #[cfg(any(target_os = "windows", target_os = "macos"))]
+use std::ptr::NonNull;
+#[cfg(any(target_os = "windows", target_os = "macos"))]
 use std::sync::OnceLock;
 
 #[cfg(any(target_os = "windows", target_os = "macos"))]
@@ -20,7 +22,7 @@ fn missing_symbol(name: &str) -> ! {
 }
 
 #[cfg(target_os = "macos")]
-unsafe fn resolve_symbol(name: &[u8]) -> *mut c_void {
+unsafe fn resolve_platform_symbol(name: &[u8]) -> *mut c_void {
     unsafe extern "C" {
         fn dlopen(filename: *const c_char, flags: c_int) -> *mut c_void;
         fn dlsym(handle: *mut c_void, symbol: *const c_char) -> *mut c_void;
@@ -51,7 +53,7 @@ unsafe fn resolve_symbol(name: &[u8]) -> *mut c_void {
 }
 
 #[cfg(target_os = "windows")]
-unsafe fn resolve_symbol(name: &[u8]) -> *mut c_void {
+unsafe fn resolve_platform_symbol(name: &[u8]) -> *mut c_void {
     #[link(name = "kernel32")]
     unsafe extern "system" {
         fn GetModuleHandleA(module_name: *const c_char) -> *mut c_void;
@@ -76,14 +78,22 @@ unsafe fn resolve_symbol(name: &[u8]) -> *mut c_void {
 }
 
 #[cfg(any(target_os = "windows", target_os = "macos"))]
+/// Resolves a VPI symbol from the host simulator.
+///
+/// Aborts the process if the requested symbol is unavailable.
+fn resolve_symbol(name: &CStr) -> NonNull<c_void> {
+    let ptr = unsafe { resolve_platform_symbol(name.to_bytes_with_nul()) };
+    NonNull::new(ptr).unwrap_or_else(|| missing_symbol(&name.to_string_lossy()))
+}
+
+#[cfg(any(target_os = "windows", target_os = "macos"))]
 #[unsafe(no_mangle)]
 unsafe extern "C" fn vpi_shim_resolve_symbol(name: *const c_char) -> *mut c_void {
-    let name = unsafe { CStr::from_ptr(name) };
-    let ptr = unsafe { resolve_symbol(name.to_bytes_with_nul()) };
-    if ptr.is_null() {
-        missing_symbol(&name.to_string_lossy());
+    if name.is_null() {
+        missing_symbol("<null symbol name>");
     }
-    ptr
+    let name = unsafe { CStr::from_ptr(name) };
+    resolve_symbol(name).as_ptr()
 }
 
 #[cfg(any(target_os = "windows", target_os = "macos"))]
@@ -96,11 +106,11 @@ macro_rules! forward_fn {
                 static FN: OnceLock<FnTy> = OnceLock::new();
                 let f = *FN.get_or_init(|| {
                     let symbol = concat!(stringify!($name), "\0").as_bytes();
-                    let ptr = unsafe { resolve_symbol(symbol) };
-                    if ptr.is_null() {
-                        missing_symbol(stringify!($name));
+                    let name = CStr::from_bytes_with_nul(symbol)
+                        .expect("forwarded symbol names are null-terminated");
+                    unsafe {
+                        std::mem::transmute::<*mut c_void, FnTy>(resolve_symbol(name).as_ptr())
                     }
-                    unsafe { std::mem::transmute::<*mut c_void, FnTy>(ptr) }
                 });
                 unsafe { f($($arg),*) }
             }
@@ -118,11 +128,11 @@ macro_rules! forward_variadic_fn {
                 static FN: OnceLock<FnTy> = OnceLock::new();
                 let f = *FN.get_or_init(|| {
                     let symbol = concat!(stringify!($name), "\0").as_bytes();
-                    let ptr = unsafe { resolve_symbol(symbol) };
-                    if ptr.is_null() {
-                        missing_symbol(stringify!($name));
+                    let name = CStr::from_bytes_with_nul(symbol)
+                        .expect("forwarded symbol names are null-terminated");
+                    unsafe {
+                        std::mem::transmute::<*mut c_void, FnTy>(resolve_symbol(name).as_ptr())
                     }
-                    unsafe { std::mem::transmute::<*mut c_void, FnTy>(ptr) }
                 });
                 unsafe { f($($arg),+ $(, $vararg)?) }
             }
@@ -140,11 +150,11 @@ macro_rules! forward_fn_void {
                 static FN: OnceLock<FnTy> = OnceLock::new();
                 let f = *FN.get_or_init(|| {
                     let symbol = concat!(stringify!($name), "\0").as_bytes();
-                    let ptr = unsafe { resolve_symbol(symbol) };
-                    if ptr.is_null() {
-                        missing_symbol(stringify!($name));
+                    let name = CStr::from_bytes_with_nul(symbol)
+                        .expect("forwarded symbol names are null-terminated");
+                    unsafe {
+                        std::mem::transmute::<*mut c_void, FnTy>(resolve_symbol(name).as_ptr())
                     }
-                    unsafe { std::mem::transmute::<*mut c_void, FnTy>(ptr) }
                 });
                 unsafe { f($($arg),*) }
             }
@@ -169,6 +179,7 @@ forward_fn! {
     fn vpi_get_vlog_info(vlog_info_p: vpi_sys::p_vpi_vlog_info) -> vpi_sys::PLI_INT32;
     fn vpi_compare_objects(object1: vpi_sys::vpiHandle, object2: vpi_sys::vpiHandle) -> vpi_sys::PLI_INT32;
     fn vpi_chk_error(error_info_p: vpi_sys::p_vpi_error_info) -> vpi_sys::PLI_INT32;
+    fn vpi_free_object(object: vpi_sys::vpiHandle) -> vpi_sys::PLI_INT32;
     fn vpi_release_handle(object: vpi_sys::vpiHandle) -> vpi_sys::PLI_INT32;
     fn vpi_flush() -> vpi_sys::PLI_INT32;
     fn vpi_put_value(

@@ -5,7 +5,7 @@ use vpi_sys::{vpiHandle, PLI_INT32};
 ///
 /// This type provides convenience helpers for common handle operations and
 /// iteration over child objects.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Handle {
     /// Underlying simulator-owned VPI handle pointer.
     handle: vpiHandle,
@@ -29,6 +29,12 @@ impl Drop for Handle {
         if !self.is_null() {
             unsafe {
                 vpi_sys::vpi_release_handle(self.handle);
+            }
+        }
+        #[cfg(not(feature = "release_handle"))]
+        if !self.is_null() {
+            unsafe {
+                vpi_sys::vpi_free_object(self.handle);
             }
         }
     }
@@ -145,6 +151,15 @@ impl Handle {
         Self::from_raw(handle)
     }
 
+    /// Returns the intermodule path between this handle and `other`.
+    ///
+    /// This is a convenience wrapper for
+    /// `get_multi(ObjectType::InterModPath, other)`.
+    #[must_use]
+    pub fn get_intermod_path(&self, other: &Handle) -> Self {
+        self.get_multi(ObjectType::InterModPath, other)
+    }
+
     /// Returns a child handle by multiple indices.
     ///
     /// This wraps `vpi_handle_by_multi_index` and is used for
@@ -205,5 +220,15 @@ impl Iterator for HandleIterator {
         } else {
             Some(next)
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Handle;
+
+    #[test]
+    fn get_intermod_path_returns_null_for_null_handles() {
+        assert!(Handle::null().get_intermod_path(&Handle::null()).is_null());
     }
 }
