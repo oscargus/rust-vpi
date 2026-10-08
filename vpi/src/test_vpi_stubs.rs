@@ -1,6 +1,6 @@
 #![allow(clippy::missing_const_for_fn)]
 #![cfg(all(
-    test,
+    any(test, feature = "test_stubs"),
     any(
         not(any(target_os = "windows", target_os = "macos")),
         not(feature = "dynamic")

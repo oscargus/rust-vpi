@@ -13,6 +13,7 @@ This crate wraps `vpi-sys` with a safer API surface.
 - `cb_info`: Enabled by default. Uses `vpi_get_cb_info` when removing callbacks.
 - `dynamic`: On Windows/macOS, use runtime symbol lookup via `vpi-shim` so plugins can be built without directly linking simulator libraries.
 - `release_handle`: Call `vpi_release_handle` when dropping a `Handle`.
+- `test_stubs`: Provide Linux VPI stubs for downstream test builds without a simulator.
 - `sv`: Enable SystemVerilog VPI extensions.
 - `value_array`: Use array-based functions in VPI. If not, they are implemented using scalar access.
 - `verilator`: Add some Verilator-specific extensions.
