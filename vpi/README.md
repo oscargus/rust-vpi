@@ -27,7 +27,7 @@ Add this crate as a dependency in your plugin crate and build as `cdylib`.
 crate-type = ["cdylib"]
 
 [dependencies]
-vpi = "0.6"
+vpi = "0.7"
 ```
 
 See top-level project examples for complete plugin implementations.
